@@ -1,0 +1,35 @@
+---
+title: "ideas"
+format: html
+editor: source
+---
+
+## 
+
+
+$$
+P_{ij} \sim Normal(\mu_{ij}, \sigma_{\text{residual}})\\
+\mu_{ij} = \alpha_{j} + \beta_{j}\text{S}_{i} + \gamma_{j}\text{W}_{i}\\
+\begin{pmatrix}
+\alpha_{j} \\
+\beta_{j} \\
+\gamma_{j}
+\end{pmatrix}
+\sim \mathcal{MVN} \left(
+\begin{pmatrix}
+\bar{\alpha} \\
+\bar{\beta} \\
+\bar{\gamma}
+\end{pmatrix},
+\begin{pmatrix}
+\tau^2_{\alpha} & \rho_{\alpha\beta} \tau_{\alpha} \tau_{\beta} & \rho_{\alpha\gamma} \tau_{\alpha} \tau_{\gamma}\\
+\rho_{\alpha\beta} \tau_{\alpha} \tau_{\beta} & \tau^2_{\beta} & \rho_{\beta\gamma} \tau_{\beta} \tau_{\gamma} \\
+\rho_{\alpha\gamma} \tau_{\alpha} \tau_{\gamma} & \rho_{\beta\gamma} \tau_{\beta} \tau_{\gamma} & \tau^2_{\gamma}\\
+\end{pmatrix}
+\right), \text{for experiment } j = 1, \dots, J
+$$
+In the syntax of the frequently used R-package *lme4*, this model would have the following structure:
+
+$$
+P \sim S + W + X + (1 + S + W | E)
+$$

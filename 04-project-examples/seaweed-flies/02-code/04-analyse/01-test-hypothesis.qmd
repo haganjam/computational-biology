@@ -1,0 +1,131 @@
+---
+title: "01-analyse-clean-data"
+author: "James G. Hagan"
+format: gfm
+editor: source
+---
+
+## Analyse the data to test our hypothesis
+
+Now we are ready to analyse the data that we have collected. We have explored and cleaned the data and we pre-registered both our hypothesis and the method that we will use to analyse the data. At this point, it is now up to us to simply fit the model that we proposed in the project plan (01-plan/01-design.qmd).
+
+```{r}
+# load relevant libraries
+library(lme4)
+library(lmerTest)
+library(dplyr)
+```
+
+```{r}
+# load the data cleaning script
+source(here::here("04-project-examples/seaweed-flies/02-code/functions/get_clean_data.R"))
+
+# load the cleaned dataset with all data points
+clean_data <- get_clean_data(handle_outliers = NA)
+head(clean_data)
+```
+
+To match with the planning simulations we did, we will convert *species_abb* to a factor and make sure the P (*Coleopa pilipes*) is first and F is second (*Coleopa frigida*).
+
+```{r}
+# convert species_abb to a factor and re-level
+clean_data$species_abb <- factor(clean_data$species_abb, levels = c("P", "F"))
+print(clean_data$species_abb)
+```
+
+No experiment or study is perfect and. in many cases, we do not achieve the desired sample sizes. Our power analysis showed that detecting a large effect size of -4.5 would require 50-60 individuals of each species whilst more moderate effect sizes (e.g. -2.5) would need more than 120 flies per species. During the fieldwork, we discovered that it was more difficult to collect the flies and we were only able to collect 36 flies (24 *C. pilipes* and 12 *C. frigida*). This means that, inherently, our study has low power to detect an effect.
+
+```{r}
+clean_data |>
+  dplyr::group_by(species_name) |>
+  dplyr::summarise(n = dplyr::n())
+```
+
+Now we can fit the model that we specified in the project plan. Looking at the estimates initially, it shows that the parameters are actually quite close to our simulations. This indicates that we probably made reasonable assumptions in our power analysis based on literature and on the pilot data that we collected.
+
+```{r}
+# fit the model
+lmm1 <- lmerTest::lmer(scp_c ~ species_abb + weight_mg + species_abb:weight_mg + (1 | experiment_n), 
+                       data = clean_data)
+print(lmm1)
+```
+
+Next, to make sure that our model can reproduce the observed data, we can plot the observed versus the predicted values. The model does not fit the data very well. This is not necessarily a problem for making inference but it is still useful to look at.
+
+```{r}
+# get the predicted values
+pred_scp_c <- predict(lmm1)
+
+# plot the observed versus predicted values
+plot(clean_data$scp_c, pred_scp_c)
+abline(0, 1)
+```
+
+Moreover, we want to examine the residual distribution to see if the model assumptions are met. First, we can look at the residual distribution which should look kind of normal.
+
+```{r}
+# check residual distribution
+hist(residuals(lmm1))
+```
+
+In addition, the residuals should not change with the fitted values and this looks reasonably good.
+
+```{r}
+# check residual distribution
+plot(lmm1)
+```
+
+However, the model is *singular* which typically means that there is insufficient variation among the levels of the random factor. As you can see, the estimated variance for the *experiment_n* term variable is 0. As a sanity check, we can check the variance if we calculate the mean *SCP* of each experiment. As you can see, the average *SCP* between experiments is very similar besides experiment 5.
+
+```{r}
+# calculate the variance between group-means of experiment_n
+clean_data |>
+  dplyr::group_by(experiment_n) |>
+  dplyr::summarise(scp_c_m = mean(scp_c)) |>
+  head()
+```
+Given that the model is singular and this can compromise inference, we will do things. First, we will conduct inference using this singular fitted model (lmm1). Then, we will also drop the random intercept term and conduct inference with a simpler linear model. This is reasonable because a linear mixed effect model with a random intercept term whose variance is estimated at zero effectively simplifies to a standard linear model with a single intercept term.
+
+The critical test of the hypothesis is whether the *species_abbF* in the model is significantly different from zero as this indicates that the species differ in the *SCP*. We can check the model summary for this. What we see is that the estimate of the *species_abbF* is -1.8. This means that, on average, *C. frigida* has an *SCP* of 1.8 degrees C lower than *C. pilipes*. However, given the variability in the estimate and the degrees of freedom, the probability of observing a more extreme estimate under the null hypothesis that the effect is zero is 0.33 (P = 0.332).
+
+However, given that we know that the power of this test is very low, this experiment does not constitute strong evidence in favour of the null hypothesis or the alternative hypothesis.
+
+```{r}
+# check the model summary
+summary(lmm1)
+```
+
+For completeness, we will conduct the analysis with a simple linear model but the results are veyr similar.
+
+```{r}
+# fit the model
+lm1 <- lm(scp_c ~ species_abb + weight_mg + species_abb:weight_mg, data = clean_data)
+summary(lm1)
+```
+
+
+## Test sensitivity of the results to data cleaning decisions
+
+We built different outlier procedures into the data cleaning function. Therefore, we can also see how sensitive the results to removing these different outliers. The general result does not change.
+
+```{r}
+# which outlier exclusion criteria: all, weight, scp
+outlier_choice <- "scp"
+
+# load the cleaned dataset with all data points
+clean_data <- get_clean_data(handle_outliers = outlier_choice)
+
+# convert species_abb to a factor and re-level
+clean_data$species_abb <- factor(clean_data$species_abb, levels = c("P", "F"))
+
+# fit the model
+lmm_outlier <- lmerTest::lmer(scp_c ~ species_abb + weight_mg + species_abb:weight_mg + (1 | experiment_n), 
+                              data = clean_data)
+summary(lmm_outlier)
+```
+
+
+
+
+
+

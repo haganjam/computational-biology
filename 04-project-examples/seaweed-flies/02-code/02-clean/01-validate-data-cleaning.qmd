@@ -1,0 +1,121 @@
+---
+title: "01-validate-data-cleaning"
+author: "James G. Hagan"
+format: pdf
+editor: source
+---
+
+## Validate data-cleaning script
+
+After Exploratory Data Analaysis, we now have a good sense of the dataset that we want. Moreover, we used the learnings from the Exploratory Data Analysis to write a function (*functions/get_clean_data.R*) to perform these cleaning procedures.
+
+The next step is to make sure that our data cleaning is working as we expect it. To do this, we will simulate an idealised version of the dataset that we have in mind. Often it is useful to sketch out on paper or in a random spreadsheet how you want the data to look (Alexander 2023) (but you do you). Then, based on this idealised version of the data, we will write a series of tests. The simulated dataset should pass all these tests as we have specifically simulated it to match our expectation of the data. We can then use these same tests to determine if our data cleaning has worked properly.
+
+```{r}
+# simulate an idealised version of the dataset
+
+# how many datapoints?
+n <- 10
+
+# simulate the base variables
+ideal_data <-
+  dplyr::tibble(row_id = as.character(seq_len(n)),
+                experiment_n = as.character(sample(x = seq_len(3), size = n, replace = TRUE)),
+                species_name = sample(x = c("Coleopa frigida", "Coleopa pilipes"), size = n, replace = TRUE))
+
+# add the species_abb variable
+ideal_data$species_abb <- with(ideal_data,
+                               ifelse(species_name == "Coleopa frigida", "F", "P"))
+
+# add weight_mg variable
+ideal_data$weight_mg <- runif(n = n, min = 0.5, 20)
+
+# add scp_c variable
+ideal_data$scp_c <- runif(n = n, min = -20, max = -1)
+
+# view the ideal dataset
+head(ideal_data)
+
+``` 
+
+Using this idealised dataset, we can write a series of tests. The *validator* package is quite useful for this but there are also many other ways to do this using R.
+
+```{r}
+# load the validate package
+library(validate)
+
+# set-up data validation rules for this dataset
+rules <- validator(
+  "scp_c should be numeric" = is.numeric(scp_c),
+  "weight_mg should be numeric" = is.numeric(weight_mg),
+  "all scp_c values should be less than 0" = all(scp_c < 0),
+  "all weight_mg values should be greater than 0" = all(weight_mg > 0),
+  "all experiment_n values should be sequential" = all(experiment_n %in% as.character(seq_len(length(unique(experiment_n))))),
+  "species_name values should be correct" = all(species_name %in% c("Coleopa frigida", "Coleopa pilipes")),
+  "species_name values should match the species_abb values" = all(ifelse(species_name == "Coleopa frigida", "F", "P") == species_abb)
+)
+
+# confront the data with these rules
+out <- confront(ideal_data, rules)
+```
+
+We have stored the tests in this *out* object. Let's see what this object holds. So, it says that we confronted the simulated data with 7 rules and there were no fails. That's what we want.
+
+```{r}
+# check the output
+out
+```
+
+We can also look at the tests in more detail using the summary function on the out object.
+
+```{r}
+# extract the rules
+summary(out)
+```
+
+Now that we have checked whether our idealised version of the data passes our tests, we can now test the cleaned dataset produced via the function that we wrote to clean the data (*functions/get_clean_data.R*). We can also test all the different versions possible (i.e. removal of various outliers).
+
+Let's test the clean dataset using these rules. First, we need to load the data cleaning function.
+
+```{r}
+# load the cleaning function
+source(here::here("04-project-examples/seaweed-flies/code/functions/get_clean_data.R"))
+```
+
+Next, we test the data without any outliers being removed and all tests are passed:
+
+```{r}
+# load and clean the data with no outliers removed
+clean_data <- get_clean_data(handle_outliers = NA)
+
+# confront the data with these rules
+confront(clean_data, rules)
+```
+
+We then check all the different versions of the data that we generated using the cleaning function:
+
+```{r}
+# load and clean the data with all outliers removed
+clean_data <- get_clean_data(handle_outliers = "all")
+
+# confront the data with these rules
+confront(clean_data, rules)
+```
+```{r}
+# load and clean the data with all outliers removed
+clean_data <- get_clean_data(handle_outliers = "weight")
+
+# confront the data with these rules
+confront(clean_data, rules)
+```
+```{r}
+# load and clean the data with all outliers removed
+clean_data <- get_clean_data(handle_outliers = "scp")
+
+# confront the data with these rules
+confront(clean_data, rules)
+```
+
+As we can see, the cleaned data in all its possible versions passed the seven tests that we set-up. This means that we are confident with our data cleaning procedures.
+
+

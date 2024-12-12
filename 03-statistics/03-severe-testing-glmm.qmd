@@ -1,0 +1,225 @@
+---
+title: "03-severe-test-glmm"
+format: html
+---
+
+## Severe testing using mixed models
+
+The notion of severity was developed by Deborah Mayo as a way to assess the strength of statistical claims. Mayo defines the notion of severe testing in the following way at the beginning of her book: "A claim is severely tested to the extent that is has been subjected to and passed a test that probably would have found flaws, were they present." Throughout the book, she elaborates this concept and uses examples from classical statistics (e.g. one-sample t-tests etc.). In this article, I am going to try and think about and use this notion in the context of a classic ecological experiment.
+
+```{r}
+# sim global mean (mu_global = 100) and global standard deviation (sigma_global = 10)
+mu_global <- 100
+sigma_global <- 10
+
+# sim global treatment effect mean (b1_mu_global = 5) and standard deviation (b1_sigma_global = 2)
+b1_mu_global <- 5
+b1_sigma_global <- 2.5
+
+# build the covariance matrix
+cov_val <- 2.5
+cov_mat <- matrix(data = c((sigma_global^2), cov_val, cov_val, (b1_sigma_global^2)), 2, 2)
+
+# set the number of locations
+locations <- 15
+
+# simulate from the multivariate normal
+dist_global <- MASS::mvrnorm(n = locations,
+                             mu = c(mu_global, b1_mu_global),
+                             Sigma = cov_mat)
+
+# plot this multivariate normal distribution
+dist_global <- dplyr::as_tibble(as.data.frame(dist_global))
+names(dist_global) <- c("a_j", "b1_j")
+
+ggplot(data = dist_global,
+       mapping = aes(x = a_j, y = b1_j)) +
+  geom_point() +
+  ylab("beta_j") +
+  xlab("alpha_j") +
+  theme_minimal()
+```
+
+```{r}
+# build a data.frame with the simulated means
+dat_mu <- 
+  dplyr::tibble(location = rep(c(seq_len(locations)), 2),
+                treatment = rep(c("agricultural: control", "food-forest: treatment"),
+                                each = locations),
+                mu_ij = c(dist_global$a_j, (dist_global$a_j + dist_global$b1_j)))
+head(dat_mu)
+
+# visualise the results as a location scatterplot
+ggplot(data = dat_mu,
+       mapping = aes(x = location, y = mu_ij, colour = treatment)) +
+  geom_point() +
+  geom_hline(yintercept = mu_global, colour = "red", linetype = "dashed") +
+  ylab("mu ij") +
+  xlab("Location j") +
+  theme_classic()
+```
+```{r}
+# number of within-plot replicates
+replicates <- 10
+
+# set the residual standard deviation
+sigma_residual <- 5
+
+# simulate six replicates in each location-group combination
+dat_list <- vector("list", length = nrow(dat_mu)) 
+for (i in seq_along(dat_list)) {
+  
+  # extract the first location-group combination
+  x <- dat_mu[i, ]
+  
+  # simulate 6 random draws using the mean and residual standard deviation
+  y <- rnorm(n = replicates, mean = x$mu_ij, sd = sigma_residual)
+  
+  # add this to the data.frame
+  z <- dplyr::tibble(location = x$location,
+                     treatment = x$treatment,
+                     B_i = y)
+  
+  # add this to an output list
+  dat_list[[i]] <- z
+  
+}
+
+# bind into a data.frame
+dat <- dplyr::bind_rows(dat_list)
+
+```
+
+Now that we have the fully simulated dataset, we can plot it and see what we are dealing with here.
+
+```{r}
+# visualise the results as a location scatterplot
+ggplot() +
+  geom_point(data = dat_mu,
+             mapping = aes(x = location, y = mu_ij, colour = treatment), 
+             size = 3.5, shape = 18) +
+  geom_point(data = dat,
+             mapping = aes(x = location, y = B_i, colour = treatment),
+             alpha = 0.1) +
+  geom_hline(yintercept = mu_global, colour = "red", linetype = "dashed") +
+  ylab("mu ij") +
+  xlab("Location j") +
+  theme_classic()
+```
+
+In the previous tutorial, we explored the relevant model we needed for this experiment so I will not go there in this case. However, I want to spend some time thinking about what kind of inferences we would draw from this model. But first, let's fit the model.
+
+```{r}
+# fit the model with correlated random intercepts and slopes
+lmm2 <- lme4::lmer(B_i ~ treatment + (1 + treatment | location), data = dat)
+summary(lmm2)
+```
+
+In this experiment, our estimate of interest is the treatment effect (i.e. treatmentfood-forest: treatment). Now, we will use notions of severity to probe the various claims that we can make using this model.
+
+Before we can do this,
+
+```{r}
+# bootstrap the t-values
+model <- function(data) {
+  x <- lme4::lmer(B_i ~ treatment + (1 + treatment | location), data = data)
+  summary(x)
+}
+
+simulator <- function(data) {
+  rows <- sample(nrow(data), nrow(data), replace = TRUE)
+  data[rows, ]
+}
+
+estimator <- function(data) {
+  coefficients(model(data))[,1]
+}
+
+test <- function(data, b.test) {
+  fit <- model(data)
+  b <- coefficients(fit)[,1]
+  var <- diag(vcov(fit))
+  t <- (b - b.test) / sqrt(var)
+  t
+}
+
+# set the alternative hypothesis
+h_alt <- 0
+
+B <- 1000
+
+# get the observed estimate
+beta_hat <- estimator(dat)
+beta_hat
+
+t_stat <- test(data = dat, h_alt) # Calculate (beta.hat - 0) / se(beta.hat)
+t_stat
+
+# bootstrap the t-statistics.
+boot_t_stat <- replicate(B, test(simulator(data), beta_hat)) # Calculate (beta.star - beta.hat) / se(beta.star)
+
+# check the probability
+boot_t_stat[2,]
+
+t_stat[2] > quantile(boot_t_stat[2,], 0.95)
+
+
+
+# calculate bootstrap t-distribution under the hypothesis
+
+# compare observed t-value
+
+
+```
+
+
+
+```{r}
+# test for a discrepancy from zero
+lmm2_sum <- summary(lmm2)
+
+# get the coefficients
+est <- coefficients(lmm2_sum)[2,1]
+
+# get the standard errors
+est_se <- coefficients(lmm2_sum)[2,2]
+
+# get the degrees of freedom (Satterwaite's approximation)
+df <- coefficients(lmm2_sum)[2,3]
+
+# calculate the severity of different claims
+h0_mu <- seq(0, 20, 0.1)
+
+severity_curve <- vector("list", length = length(h0_mu))
+for (i in seq_along(h0_mu)) {
+  
+  t <- (est - h0_mu[i])/est_se
+  p_val <- 1 - pt(q = t, df = df)
+  
+  # write into a data.frame
+  severity_curve[[i]] <- dplyr::tibble(h0_mu = h0_mu[i],
+                                       t = t,
+                                       p_val = p_val,
+                                       severity = 1 - p_val)
+  
+}
+
+# bind into a data.frame
+severity_curve <- dplyr::bind_rows(severity_curve)
+
+# plot this curve
+ggplot(data = severity_curve,
+       mapping = aes(x = h0_mu, y = severity)) +
+  geom_line() +
+  theme_classic()
+```
+
+
+
+
+
+
+
+
+
+

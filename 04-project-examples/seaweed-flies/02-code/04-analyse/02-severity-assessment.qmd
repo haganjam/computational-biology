@@ -1,0 +1,33 @@
+---
+title: "03-severity-assessment"
+author: "James G. Hagan"
+format: gfm
+editor: source
+---
+
+```{r}
+# load relevant libraries
+library(lme4)
+library(lmerTest)
+library(dplyr)
+```
+
+```{r}
+# load the data cleaning script
+source(here::here("04-project-examples/seaweed-flies/02-code/functions/get_clean_data.R"))
+
+# load the cleaned dataset with all data points
+clean_data <- get_clean_data(handle_outliers = NA)
+head(clean_data)
+```
+
+```{r}
+# convert species_abb to a factor and re-level
+clean_data$species_abb <- factor(clean_data$species_abb, levels = c("P", "F"))
+print(clean_data$species_abb)
+```
+
+
+
+
+

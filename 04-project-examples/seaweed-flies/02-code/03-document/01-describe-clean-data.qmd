@@ -1,0 +1,54 @@
+---
+title: "01-describe-clean-data"
+author: "James G. Hagan"
+format: html
+editor: source
+---
+
+## Describe clean data
+
+So far, we have conducted some Exploratory Data Analysis, wrote a data-cleaning function and tested that cleaning functions on simulated data and on the cleaned data. Now that we have our cleaned dataset, it is useful to take a moment to describe the clean data that we will be working with. This document should allow someone to open this document and understand each variable in the cleaned dataset.
+
+### Load and view the cleaned data
+
+```{r}
+# load the data cleaning function
+source(here::here("04-project-examples/seaweed-flies/code/functions/get_clean_data.R"))
+
+# create a view of the cleaned data (or one version of it)
+get_clean_data(handle_outliers = NA)
+```
+
+### Metadata
+
+**row_id**:
+
+*type* - character.\
+*descr* - unique numeric identifier for each data point.
+
+**experiment_n**:
+
+*type* - character.\
+*descr* - unique numeric identifier for the experiment (sampling day) when the measurements were taken. Measurements were taken on all individual seaweed flies that were collected on a given day.
+
+**species_name**:
+
+*type* - character.\
+*descr* - latin binomial for the seaweed fly species (*Coleopa pilipes*, *Coleopa frigida*).
+
+**species_abb**:
+
+*type* - character.\
+*descr* - abbreviation for the seaweed fly species (*Coleopa pilipes* - P, *Coleopa frigida* - F).
+
+**weight_mg**
+
+*type* - numeric.\
+*accuracy* - 0.01 mg.\
+*desc* - weight of the individual seaweed fly as determined using a fine balance.
+
+**scp_c**
+
+*type* - numeric.\
+*accuracy* - 0.1 degrees C.\
+*desc* - supercooling point of the individual seaweed fly as determined using a thermocouple.

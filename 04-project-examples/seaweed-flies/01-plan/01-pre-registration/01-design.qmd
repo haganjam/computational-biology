@@ -1,0 +1,597 @@
+---
+title: "01-design"
+author: "James G. Hagan"
+format: gfm
+editor: source
+---
+
+# 1. Project Plan: Investigating Cold Tolerance in Two Seaweed Fly Species
+
+## Objective
+
+The objective of this project is to assess the cold tolerance of two coexisting seaweed fly species, *Coleopa frigida* and *Coleopa pilipes*, by analyzing their supercooling points. The study aims to explore potential physiological adaptations to their respective latitudinal distributions in Northern Europe.
+
+## Background
+
+*Coleopa frigida* and *Coleopa pilipes* are commonly found in the brown algae wrack beds that accumulate along European shorelines. These wrack beds serve as both habitat and food source for these species. Despite overlapping in much of Northern Europe, the species exhibit distinct geographic distributions:
+
+- *C. frigida* is predominant at higher latitudes in the north.
+- *C. pilipes* is more common at lower latitudes in the south.
+
+Given these distribution patterns, it is hypothesized that *C. frigida* may exhibit a higher tolerance to cold compared to *C. pilipes*. This hypothesis remains largely untested, and this study aims to fill that gap.
+
+## Data Collection and Experimental Procedure
+
+### Study Location
+
+Seaweed flies will be collected from brown algae wrack beds in the Tjärnö Archipelago on the Swedish West Coast during the winter. Wrack beds will be selected by using existing drone imagery to map the wrack beds on the seashores in the study area (e.g. Reeve et al. 2024). Wrack beds will be randomly selected in the study area for seaweed fly sampling.
+
+### Laboratory Processing
+
+All seaweed flies collected on a given day will be processed in the lab as follows:
+
+1. **Weighing**  
+   Each individual fly will be weighed to record its mass.
+
+2. **Supercooling Point (SCP) Measurement**  
+   - The supercooling point (SCP) of each fly will be measured using a thermocouple.
+   - The SCP is defined as the temperature at which ice formation begins in the organism’s body. 
+   - SCP is a critical metric for assessing cold tolerance, as many insects lower their SCP by accumulating antifreeze compounds, such as sugars and polyols.
+
+### Sampling Timeline
+
+The collection and experimental procedures will be conducted over multiple days during the winter season. Sampling will continue until a specific sample size is achieved (refer to `02-power-analysis` for details on sample size determination).
+
+## Analysis Plan
+
+The experimental design implies a very simple causal model which we have represented as a Directed Acyclic Graph (see below). This model implies that *Species* can affect supercooling point (*SCP*) directly or via its effect on *Weight*. Moreover, there is a potential effect of *Experiment* (i.e. the day the measurements are taken).
+
+```{r}
+dag1 <- dagitty::dagitty(x = 'dag {
+bb="0,0,1,1"
+Experiment [exposure,pos="0.535,0.230"]
+SCP [outcome,pos="0.535,0.345"]
+Species [exposure,pos="0.45,0.230"]
+Weight [exposure,pos="0.368,0.345"]
+Experiment -> SCP
+Species -> SCP
+Species -> Weight
+Weight -> SCP
+}'
+)
+plot(dag1)
+```
+
+In this study, we are most interested in the direct effect of *Species* on *SCP* (i.e. arrow going directly from *Species* to *SCP* in the DAG above). Analysing this DAG Using the backdoor criterion (Pearl 2009) shows that to estimate the direct effect of *Species* on *SCP* requires adjusting for both *Weight*. This can be seen by analysing the adjustmentsets:
+
+```{r}
+# how to estimate the direct effect of species on supercooling point?
+dagitty::adjustmentSets(x = dag1, exposure = "Species", outcome = "SCP", effect = "direct")
+```
+
+In addition, if we adjust for *Experiment*, we can improve the precision of our estimates (Cinelli et al. 2022) and we also want to allow the effect of *Weight* on *SCP* to vary by species. Therefore, to estimate our effect of interest (i.e. the direct effect of *Species* on *SCP*), we will fit the following model where the variables are abbreviated as: (*SCP* - *P*, *Species* - *S*, *Weight* - *W*, *Experiment* - *E*).
+
+$$
+P_{ij} \sim Normal(\mu_{ij}, \sigma_{residual})
+$$
+$$
+\mu_{ij} = \alpha_{j} + \beta_1\text{S}_{i} + \beta_2\text{W}_{i} + \beta_3\text{S}_{i}\text{W}_{i}
+$$
+
+$$
+\alpha_{j} \sim Normal(\bar{\alpha}, \tau_{\bar{\alpha}}) \text{, for experiment j = 1,} \dots \text{,J}
+$$
+
+This model fits a random intercept for the *Experiment* along with fixed effects for *Species*, *Weight* and the *Species* by *Weight* interaction. In the syntax of the frequently used R-package *lme4*, this model would have the following structure:
+
+$$
+P \sim S + W + X + (1 | E)
+$$
+
+We could have fit random slopes for the three fixed effects. However, the different *Experiments* are simply done on different days and, therefore, it unlikely that these effects would vary substantially between experiments.
+
+## Expected Outcomes
+
+This study will provide insights into the physiological mechanisms underlying the latitudinal distributions of *C. frigida* and *C. pilipes*. We anticipate that:
+
+- *C. frigida* will exhibit lower SCPs, consistent with its adaptation to colder northern climates.
+- *C. pilipes* may demonstrate higher SCPs indicative of lower cold tolerance.
+
+## Significance
+
+Understanding the cold tolerance of these species has implications for predicting their responses to environmental changes, particularly in the context of climate change and its impact on coastal ecosystems.
+
+
+# 2. Power analysis
+
+```{r}
+# load relevant libraries
+library(lme4)
+library(lmerTest)
+library(ggplot2)
+```
+
+
+## Simulating the data-generating process
+
+Given this project plan, we will use simulation to determine appropriate sample sizes for detecting the difference in supercooling points between the two seaweed fly species. For this, we need to first write an appropriate generative simulation for the model we plan to fit. 
+
+Based on the DAG, we need to simulate a set of *Species* and *Experiments* because these have no parents in this DAG (i.e. their values are determined externally to the DAG). To do this, we set the number of seaweed flies of each species that we want to collect. In addition, we set the number of experiments over which these seaweed flies will be collected. To start, we set high replication because we need to make sure that we are correctly simulating our data-generating process.
+
+```{r}
+# set the number of seaweed flies of each species
+
+# C. pilipes
+n_f <- 1000
+
+# C. frigida
+n_p <- 1000
+
+# set the number of experiments
+n_exp <- 50
+```
+
+Using these numbers, we can simulate the *Species* and *Experiment* variables as random draws with equal probability.
+
+```{r}
+# simulate the species variable (S): 0 - C. pilipes, 1 - C. frigida
+S <- c(rep(0, n_p), rep(1, n_f))
+
+# simulate the experiment variable
+E <- sample(seq_len(n_exp), size = (n_p + n_f), replace = TRUE)
+```
+
+Now that we have these parents, we can simulate the descendants as functions of the parents. To start, we will simulate *Weight* which is a function of *Species*. Based on Berdan et al. (2018), the average length and weight of an adult individual of *C. frigida* is around 5 mm and 5 mg respectively. In general, *C. pilipes* is slightly bigger (on average 1 mm bigger) (Egglishaw 1960). If we take the size difference ratio ($6/5 = 1.2$) and we convert this to a volume increase ($1.2^3 = 1.7$), then we can assume that, on average, *C. pilipes* probably weights around 8.6 mg. This corresponds to a difference of around 3.5 mg. In addition, we collected three individuals of each species as pilot data and we measured both *Weight* and *SCP*. These *Weight* measurements were in line with this estimate. Moreover, we used the *Weight* data to estimate the between individual standard deviation which was around 1.
+
+We use the following equation to simulate *Weight* as a function of *Species* and we substitute these prior parameter measurements where $W_{i}$ is the *Weight* variable, $\sigma_{weight}$ is 1.5, $\theta$ is the average weight of *C. pilipes* (8.5 mg), $\beta_\text{species}$ is the difference between *C. pilipes* and *C. frigida* which is around -3.5 mg and $S_{i}$ is the *Species* variable (0 - *C. pilipes*, 1 - *C. frigida*).
+
+$$
+W_{i} \sim Normal(\gamma_{i}, \sigma_{weight})
+$$
+
+$$
+\gamma_{i} = \theta + \beta_\text{species}\text{S}_{i}
+$$
+
+Let's simulate the *Weight* variable based on this linear model:
+
+```{r}
+# set the among individual weight standard deviation
+sigma_weight <- 1
+
+# set the average weight of C. frigida
+theta <- 8.5
+
+# set the difference between C. frigida and C. pilipes
+b_species <- -3.5
+
+# simulate weight using these parameters and the species variable
+
+# simulate the gamma values (i.e. conditional expectations)
+gamma_i <- theta + (b_species*S)
+
+# draw values from a normal distribution
+W <- rnorm(n = length(gamma_i), mean = gamma_i, sd = sigma_weight)
+```
+
+Now that we have simulated these *Weight* values as a function of *Species*, we can check that the model is recovering the parameters that we set so that we can be sure we fully understand the model. For this, we need a simple linear regression model. As you can see, the *(Intercept) term* which is the $\theta$ term in our model is close to 5, the *S term* which is the $\beta_\text{species}$ in our model is also close to 3.5. Moreover, the residual standard error ($\sigma_{weight}$) is close to 1. This means that we have correctly set-up the model.
+
+```{r}
+# linear model of weight as a function of species
+lm_weight <- lm(W ~ S)
+
+# print the model summary
+summary(lm_weight)
+```
+Now that we have the *Species*, *Experiment* and *Weight* variables (all the parents of *SCP*), we can simulate the *SCP* values. As mentioned previously, we collected 3 individuals of each species in a pilot and we measured their *SCPs*. Using these data, we calculated the average *SCPs* for both species:
+
+```{r}
+# pilot data for C. pilipes 
+cp <- c(-7.4, -6.2, -9)
+cp_mu <- mean(cp)
+
+# pilot data for C. frigida
+cf <- c(-12.1, -8.5, -9.7)
+cf_mu <- mean(cf)
+
+# print these results
+print(paste0("C. pilipes:: ", round(cp_mu, 2), "; C. frigida: ", round(cf_mu, 2)))
+```
+
+Based on these pilot measurements, we will set the average intercept ($\bar{\alpha}$) as -7.5 corresponding to the average *SCP* of *C. pilipes*. This intercept can vary by experiment. However, we expect this variation to be minimal. Therefore, we will set the standard deviation to 0.5 ($\tau_{\bar{\alpha}}$). Then, because the mean *SCP* of *C. frigida* in the pilot was -10.1, we will set the effect of *Species* on *SCP* to -2.5.
+
+```{r}
+# set the average intercept
+alpha_bar <- -7.5
+
+# the the standard deviation of the random intercept
+alpha_sd <- 0.5
+
+# set the value of beta1
+beta_1 <- -2.5
+```
+
+For the effect of *Weight* on *SCP*, we will start by assuming that going from a weight of 1.2 mg to 10 mg (reasonable weight range for these species: Berdan et al. 2018) could change by *SCP* by 2 C. This corresponds to a slope of approximately 0.2 ($\beta_2$). Moreover, we will assume that the interaction effect is 0.05 to start with ($\beta_3$). Both these effects will be assumed to be negative as *Weight* tends to increase cold tolerance and, therefore, should decrease *SCP*
+
+```{r}
+# set the value of beta2
+beta_2 <- -0.2
+
+# set the value of beta3
+beta_3 <- -0.05
+```
+
+Finally, we can use all the pilot data to estimate the between-individual standard deviation of both species ($\sigma_{residual}$) which is approximately 1.5. Moreover, assuming that some of that residual variation will be explained by *Weight* and *Experiment*, we can reduce this to 1.
+
+```{r}
+# pilot data for C. frigida
+cf_sd <- sd(cf)
+
+# pilot data for C. pilipes
+cp_sd <- sd(cp)
+
+# print these results
+print(paste0("C. frigida: ", round(cf_sd, 2), "; C. pilipes: ", round(cp_sd, 2)))
+
+# set the residual standard deviation
+sigma_residual <- 1
+```
+
+Using prior information (literature and pilot data), we have placed realistic values on all the relevant parameter values and variables to allow us to simulate *SCP* based on the following equation (pasted again from above):
+
+$$
+P_{ij} \sim Normal(\mu_{ij}, \sigma_{residual})
+$$
+
+$$
+\mu_{ij} = \alpha_{j} + \beta_1\text{S}_{i} + \beta_2\text{W}_{i} + \beta_3\text{S}_{i}\text{W}_{i}
+$$
+
+$$
+\alpha_{j} \sim Normal(\bar{\alpha}, \tau_{\bar{\alpha}}) \text{, for experiment j = 1,} \dots \text{,J}
+$$
+Now, we will simulate the *SCP* values using these data ($P_{ij}$):
+
+```{r}
+# simulate the alpha_j values
+alpha_j <- rnorm(n = n_exp, mean = alpha_bar, sd = alpha_sd)
+
+# simulate the u_ij values
+mu_ij <- alpha_j[E] + (beta_1 * S) + (beta_2 * W) + (beta_3 * S * W)
+
+# simulate the P_ij values from the normal distribution
+P <- rnorm(n = length(mu_ij), mean = mu_ij, sd = sigma_residual)
+```
+
+As previously with the model for *Weight*, we will now determine whether we can recover the parameters of the model to make sure that we understand the model and are correctly simulating the data-generating process that we have specified.
+
+```{r}
+# fit a linear mixed model to these data
+lmm_P <- lme4::lmer(P ~ S + W + S:W + (1 | E))
+summary(lmm_P)
+```
+
+Inspecting these parameter values, we can see that they match closely with the parameter values that we set in our simulation. This means that we understand the parameters of our model, what they mean and we are correctly simulating a data generating process that matches the model.
+
+## Power analysis
+
+Now that we know we can correctly simulate the data-generating process, we can start to explore power and sample size calculations for this experiment. We hypothesised that *C. frigida* will have higher cold tolerance (i.e. lower *SCPs*) than *C. pilipes* because *C. frigida* is found at higher latitudes and, therefore, may have developed better cold tolerance. Based on prior information, we expect that the average difference between will be -2.5 (i.e. the *SCP* of *C. frigida* will be 2.5 C lower than *C. pilipes*) corresponding to the $\beta_1$ parameter in the model.
+
+To see how many individuals of each species we would need to collect, we start by wrapping the generative simulation above into a function that will allow us to easily modify the relevant parameters:
+
+```{r}
+# function to run a single replicate of the generative simulation
+simulate_flies <- function(n_f = 1000, n_p = 1000, n_exp = 50, 
+                           sigma_weight = 1, theta = 8.5, 
+                           b_species = -3.5, alpha_bar = -7.5, 
+                           alpha_sd = 0.5, beta_1 = -2.5, 
+                           beta_2 = -0.2, beta_3 = -0.05, 
+                           sigma_residual = 1) {
+  
+  # Simulate the species variable (S): 0 - C. pilipes, 1 - C. frigida
+  S <- c(rep(0, n_p), rep(1, n_f))
+
+  # Simulate the experiment variable
+  E <- sample(seq_len(n_exp), size = (n_p + n_f), replace = TRUE)
+
+  # Simulate the gamma values (i.e. conditional expectations)
+  gamma_i <- theta + (b_species * S)
+
+  # Draw values from a normal distribution for weight
+  W <- rnorm(n = length(gamma_i), mean = gamma_i, sd = sigma_weight)
+
+  # Simulate the alpha_j values
+  alpha_j <- rnorm(n = n_exp, mean = alpha_bar, sd = alpha_sd)
+
+  # Simulate the u_ij values
+  mu_ij <- alpha_j[E] + (beta_1 * S) + (beta_2 * W) + (beta_3 * S * W)
+
+  # Simulate the P_ij values from the normal distribution
+  P <- rnorm(n = length(mu_ij), mean = mu_ij, sd = sigma_residual)
+
+  # Return the simulated data as a data frame
+  dplyr::tibble(S = S, E = E, W = W, P = P)
+  
+}
+```
+
+Using this function, we will simulate multiple datasets and then test how frequently we reject the null hypothesis that the effect of *Species* on *SCP* (i.e. $\beta_1$) is zero. We will then vary various parameters in the model (notably the sample size and the $\beta_1$ parameter) to see how this affects power. To start with, we will just do this for one set of parameter combinations. Specifically, we will simulate under the null hypothesis ($\beta_1 = 0$, beta_1_H0) and the alternative hypothesis ($\beta_1 = -2.5$, beta_1_HA) for 100 individuals of each species across 10 experiments. Moreover, we set the alpha value (i.e. p-value below which we reject the null hypothesis) (alpha_rej).
+
+```{r}
+# how many replicate simulations?
+n_sim <- 10
+
+# set the parameters: beta_1_H0 and beta_1_HA (i.e. null and alternative hypotheses)
+par_df <- dplyr::tibble(alpha_rej = 0.05, 
+                        beta_1_H0 = 0, beta_1_HA = -2.5,
+                        n_f = 100, n_p = 100, n_exp = 100, 
+                        sigma_weight = 1, theta = 8.5, 
+                        b_species = -3.5, alpha_bar = -7.5, 
+                        alpha_sd = 0.5, beta_2 = -0.2, 
+                        beta_3 = -0.05, sigma_residual = 1)
+
+# set-up a vector to store the type-I and type-II errors
+type_I_errors <- vector(length = n_sim)
+type_II_errors <- vector(length = n_sim)
+  
+# simulate under H0
+for (i in seq_len(n_sim)) {
+
+  # run the simulate_flies() function with the null parameters
+  data_H0 <- with(par_df,
+                  simulate_flies(n_f = n_f, n_p = n_p, n_exp = n_exp,
+                                 sigma_weight = sigma_weight, theta = theta,
+                                 b_species = b_species, alpha_bar = alpha_bar,
+                                 alpha_sd = alpha_sd, beta_1 = beta_1_H0,
+                                 beta_2 = beta_2, beta_3 = beta_3,
+                                 sigma_residual = sigma_residual))
+    
+  # fit the model under the null hypothesis
+  model_H0 <- lmerTest::lmer(P ~ S + W + S:W + (1 | E), data = data_H0)
+  
+  # check if the model is singular
+  singular <- lme4::isSingular(model_H0)
+  
+  # log the type_I error
+  type_I_errors[i] <- 
+    
+    if (singular) {
+    
+      # if the null is rejected, log as a type I error
+      NA
+    
+    } else {
+    
+      # extract the p-value
+      p_value_H0 <- coef(summary(model_H0))["S", "Pr(>|t|)"]
+  
+      # if the null is rejected, log as a type I error
+      as.numeric(p_value_H0 < par_df$alpha_rej)
+    
+    }
+  
+}
+  
+# simulate under H0
+for (i in seq_len(n_sim)) {
+
+  # run the simulate_flies() function with the null parameters
+  data_HA <- with(par_df,
+                  simulate_flies(n_f = n_f, n_p = n_p, n_exp = n_exp,
+                                 sigma_weight = sigma_weight, theta = theta,
+                                 b_species = b_species, alpha_bar = alpha_bar,
+                                 alpha_sd = alpha_sd, beta_1 = beta_1_HA,
+                                 beta_2 = beta_2, beta_3 = beta_3,
+                                 sigma_residual = sigma_residual))
+    
+  # fit the model under the null hypothesis
+  model_HA <- lmerTest::lmer(P ~ S + W + S:W + (1 | E), data = data_HA)
+  
+   # check if the model is singular
+  singular <- lme4::isSingular(model_HA)
+  
+  # log the type_I error
+  type_II_errors[i] <- 
+    
+    if (singular) {
+    
+      # if the null is rejected, log as a type I error
+      NA
+    
+    } else {
+    
+      # extract the p-value
+      p_value_HA <- coef(summary(model_HA))["S", "Pr(>|t|)"]
+  
+      # if the null is rejected, log as a type I error
+      as.numeric(p_value_HA >= par_df$alpha_rej)
+    
+    }
+  
+}
+
+# calculate the type I error rate across simulations
+type_I_error_rate <- sum(type_I_errors, na.rm = TRUE) / length(na.omit(type_I_errors))
+
+# calculate the type II error rate across simulations
+type_II_error_rate <- sum(type_II_errors, na.rm = TRUE) / length(na.omit(type_II_errors))
+  
+# calculate metrics
+power <- 1 - type_II_error_rate
+
+# print the metrics
+cat(paste0("\n", " Type I error: ", round(type_I_error_rate, 2), "\n"),
+    paste0("Type II error: ", round(type_II_error_rate, 2), "\n"),
+    paste0("Power: ", round(power, 2)))
+```
+
+Based on these simulations, the Type I error rate (i.e. chance of rejecting the null hypothesis when it is true) is around 0.04. We expect this to be 0.05 so this makes sense. The Type II error rate (i.e. chance of accepting the null hypothesis when the alternative is true) is 0.39 which is quite high. This gives the test a relatively low power of 0.61. This power values means that, if we were to do this experiment many times and the alternative hypothesis was true, we would only correctly reject the null hypothesis 60% of the time. This is not terrible but it means that there is a high chance that we would not be able to detect a deviation from the null hypothesis.
+
+Now that we have done this for a single set of parameter values, we can wrap this code into a function so that we can easily vary the parameters and calculate the power. This function is below:
+
+```{r}
+# function to easily run the power analysis for different parameter values
+run_power_analysis <- function(n_sim = 1000, alpha_rej = 0.05, beta_1_H0 = 0, beta_1_HA = -2.5,
+                               n_f = 30, n_p = 30, n_exp = 10, sigma_weight = 1, theta = 8.5,
+                               b_species = -3.5, alpha_bar = -7.5, alpha_sd = 0.5,
+                               beta_2 = -0.2, beta_3 = -0.05, sigma_residual = 1) {
+  
+  # Initialize vectors to store Type I and Type II errors
+  type_I_errors <- vector(length = n_sim)
+  type_II_errors <- vector(length = n_sim)
+  
+  # Initialise vectors to store the singularity information
+  singular_H0 <- vector(length = n_sim)
+  singular_HA <- vector(length = n_sim)
+  
+  # Simulate under H0 (Null Hypothesis)
+  for (i in seq_len(n_sim)) {
+    
+    # Generate data under H0
+    data_H0 <- simulate_flies(n_f = n_f, n_p = n_p, n_exp = n_exp,
+                              sigma_weight = sigma_weight, theta = theta,
+                              b_species = b_species, alpha_bar = alpha_bar,
+                              alpha_sd = alpha_sd, beta_1 = beta_1_H0,
+                              beta_2 = beta_2, beta_3 = beta_3,
+                              sigma_residual = sigma_residual)
+    
+    # Fit the model under H0
+    model_H0 <- 
+      lmerTest::lmer(P ~ S + W + S:W + (1 | E), data = data_H0,
+                     control = lmerControl(check.conv.singular = .makeCC(action = "ignore", tol = 1e-4)))
+    
+    # Check if the model is singular
+    singular_H0[i] <- lme4::isSingular(model_H0)
+    
+    # Log Type I error
+    type_I_errors[i] <-
+      if (singular_H0[i]) {
+        NA
+      } else {
+        p_value_H0 <- coef(summary(model_H0))["S", "Pr(>|t|)"]
+        as.numeric(p_value_H0 < alpha_rej)
+      }
+  }
+  
+  # Simulate under HA (Alternative Hypothesis)
+  for (i in seq_len(n_sim)) {
+    
+    # Generate data under HA
+    data_HA <- simulate_flies(n_f = n_f, n_p = n_p, n_exp = n_exp,
+                              sigma_weight = sigma_weight, theta = theta,
+                              b_species = b_species, alpha_bar = alpha_bar,
+                              alpha_sd = alpha_sd, beta_1 = beta_1_HA,
+                              beta_2 = beta_2, beta_3 = beta_3,
+                              sigma_residual = sigma_residual)
+    
+    # Fit the model under HA
+    model_HA <- 
+      lmerTest::lmer(P ~ S + W + S:W + (1 | E), data = data_HA,
+                     control = lmerControl(check.conv.singular = .makeCC(action = "ignore", tol = 1e-4)))
+    
+    # Check if the model is singular
+    singular_HA[i] <- lme4::isSingular(model_HA)
+    
+    # Log Type II error
+    type_II_errors[i] <-
+      if (singular_HA[i]) {
+        NA
+      } else {
+        p_value_HA <- coef(summary(model_HA))["S", "Pr(>|t|)"]
+        as.numeric(p_value_HA >= alpha_rej)
+      }
+  }
+  
+  # Calculate metrics
+  type_I_error_rate <- sum(type_I_errors, na.rm = TRUE) / length(na.omit(type_I_errors))
+  type_II_error_rate <- sum(type_II_errors, na.rm = TRUE) / length(na.omit(type_II_errors))
+  power <- 1 - type_II_error_rate
+  
+  # Return results
+  list(
+    singular_H0 = sum(singular_H0),
+    singular_HA = sum(singular_HA),
+    type_I_error_rate = type_I_error_rate,
+    type_II_error_rate = type_II_error_rate,
+    power = power
+  )
+  
+}
+```
+
+Based on the pilot fieldwork, we think we will be able to collect at least 20 individuals of each seaweed fly species. Moreover, we think collecting more than 150 will be difficult. Therefore, we will test different sample sizes starting from 20 going until 150. Moreover, our estimates of the effect of *Species* on *SCP* ($\beta_1$) may be too high or too low. Therefore, we will vary this parameter between 0.5 and 4.5. For this set of simulations, we will keep the other parameter values the same. The number of experiments will be based on collecting 5 flies per day.
+
+```{r}
+# set-up a grid of varying sample sizes and beta_1 parameters
+par_grid <- expand.grid(n_flies_par = seq(20, 150, 10),
+                        beta_1_HA_par = seq(-4.5, -0.5, 0.25))
+
+# convert to a tibble
+par_grid <- dplyr::tibble(par_grid)
+
+# add a n_exp_par column
+par_grid$n_exp_par <- ceiling(par_grid$n_flies_par/5)
+
+# loop over each of these parameter combinations
+power_list <- vector("list", length = nrow(par_grid))
+for (i in seq_along(power_list)) {
+  
+  # get the input parameters
+  input_pars <- par_grid[i, ]
+  
+  # run the simulation
+  power_sim_data <- run_power_analysis(n_sim = 100, alpha_rej = 0.05, 
+                                       beta_1_H0 = 0, beta_1_HA = input_pars$beta_1_HA_par,
+                                       n_f = input_pars$n_flies_par, n_p = input_pars$n_flies_par, 
+                                       n_exp = input_pars$n_exp_par, 
+                                       sigma_weight = 1, theta = 8.5,
+                                       b_species = -3.5, alpha_bar = -7.5, alpha_sd = 0.5,
+                                       beta_2 = -0.2, beta_3 = -0.05, sigma_residual = 1)
+  
+  # add the type I error, type II error and power to a list
+  power_list[[i]] <-  dplyr::tibble(run = i,
+                                    beta_1_HA = input_pars$beta_1_HA_par,
+                                    n_flies = input_pars$n_flies_par,
+                                    n_exp = input_pars$n_exp_par,
+                                    singular_H0 = power_sim_data$singular_H0,
+                                    singular_HA = power_sim_data$singular_HA,
+                                    type_1_error = power_sim_data$type_I_error_rate,
+                                    type_2_error = power_sim_data$type_II_error_rate,
+                                    power = power_sim_data$power)
+  
+}
+
+# bind into a data.frame
+power_data <- dplyr::bind_rows(power_list)
+
+```
+
+We can plot the results to see how the power varies depending on the number of flies we sample and the strength of the effect of *Species* on *SCP*.
+
+```{r}
+# plot the power curves
+library(ggplot2)
+ggplot(data = power_data |> dplyr::mutate(beta_1_HA = as.character(beta_1_HA)),
+       mapping = aes(x = n_flies, y = power, colour = beta_1_HA)) +
+  geom_point() +
+  geom_line() +
+  geom_hline(yintercept = 0.80, linetype = "dashed") +
+  xlab("Number of flies per species") +
+  ylab("Power") +
+  theme_classic() +
+  theme(legend.title = element_blank())
+```
+
+This analysis shows that even with a large effect size of -4.5 (i.e. *SCP* is -4.5 lower in *C. frigida* than in *C. pilipes*), we would need around 50-60 of each species to reliably detect an effect (i.e. power of 80% or more). Moreover, if the effect size is more moderate (e.g. -2.5), we would need more than 120 flies per species to reliably detect such an effect.
+
+
+
+
+
+
+
+
+
+
+
+

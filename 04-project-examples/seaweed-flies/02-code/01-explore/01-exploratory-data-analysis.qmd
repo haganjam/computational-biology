@@ -1,0 +1,286 @@
+---
+title: "01-exploratory-data-cleaning"
+author: "James G. Hagan"
+format: html
+editor: source
+---
+
+```{r}
+# load relevant libraries
+library(dplyr)
+library(readr)
+library(tidyr)
+```
+
+# Exploratory data analysis
+
+What is exploratory data analysis (EDA)? There is no single definition but I have adapted Alexander's (2023) definition: EDA is the process of familiarizing oneself with a new dataset by examining the data and creating graphs, tables, and models to uncover its characteristics. The goal of EDA is to understand three key aspects: the behavior and properties of each variable individually, the relationships between individuals and relevant variables, and the data that are missing. Through this process, we aim to identify the dataset's unique features, potential issues, and how these may influence subsequent analysis decisions. Particular attention is given to missing values and outliers, as they can significantly impact the insights derived from the data.
+
+There is a lot of creativity involved in EDA but many of the checks that you do will be similar for all your projects and we will go through some of these. We will use this process to not only understand the data but also to inform how we do the data cleaning for this dataset.
+
+## Load the data
+
+Here we will load the raw data that was gathered during the experiment. Usually, I will load the data, check the variable types and then adjust then until I am happy. It is always better to specifically set the variable types than to let the function in R guess them as R will often get this wrong.
+
+```{r}
+# load the raw data
+raw_data <- readr::read_csv(here::here("04-project-examples/seaweed-flies/raw-data/seaweed-flies-exp-raw-data.csv"),
+                            col_types = c("cnncn"))
+
+# check the structure of the variables
+dplyr::glimpse(raw_data)
+```
+
+## Check the data
+
+We will start by examining the first few rows and the last few rows of the data to get a general sense of what it looks like:
+
+```{r}
+# check the first few rows
+head(raw_data)
+```
+
+```{r}
+# check the last few rows
+tail(raw_data)
+```
+
+Then, we might also want to check a few random rows of the data:
+
+```{r}
+# sample a few random rows of data
+raw_data |>
+  dplyr::slice_sample(n = 6)
+```
+
+## Variable names
+
+In my view, variable names should follow standard convetions for machine readability. This means that there should not be any spaces, special characters or capital letters. There is a convenience function to do just this from the *janitor* R-package but I prefer to simply do it manually. Let's rename these variables.
+
+```{r}
+# rename the variables
+raw_data <-
+  raw_data |>
+  dplyr::rename(experiment_n = Experiment,
+                species_abb = Species,
+                weight_mg = Weight,
+                scp_id = SCP_ID,
+                scp_c = SCP)
+
+# check the data
+head(raw_data)
+```
+
+In addition, we are missing a couple of variables that would be nice to add. First is a unique identifier for the row (*row_id*) and a variable with the full species name (*species_name*) and not just the abbreviation (*species_abb*). Let's do this:
+
+```{r}
+# add row_id and species_name variables
+raw_data <-
+  raw_data |>
+  dplyr::mutate(row_id = as.character(seq_len(nrow(raw_data))),
+                species_name = ifelse(species_abb == "F", "Coleopa frigida", "Coleopa pilipes"))
+```
+
+Moreover, in this case the variable order is not very logical. Therefore, we will also re-order the variables to make it more logical and we will drop the *scp_id* variable which is not very useful.
+
+```{r}
+# remove scp_id, add row_id, reorder variables
+raw_data <-
+  raw_data |>
+  dplyr::select(row_id, experiment_n, species_name, species_abb, weight_mg, scp_c)
+```
+
+## Check unique values
+
+For the variables that can only take a limited set of values, it is often crucial to check them to make sure that this is indeed the case.
+
+```{r}
+# check unique values
+unique(raw_data$row_id)
+```
+
+As we can see, the *experiment_n* is problematic as it is missing the value two. We would like this to be corrected so we will add a cleaning step.
+
+```{r}
+# check unique values
+unique(raw_data$experiment_n)
+```
+
+```{r}
+# check unique values
+unique(raw_data$species_name)
+```
+
+```{r}
+# check unique values
+unique(raw_data$species_abb)
+```
+
+Fix the *experiment_n* values so that they go from 1 to 5:
+
+```{r}
+# fix experiment_n
+raw_data <-
+  raw_data |>
+  dplyr::mutate(experiment_n =
+      dplyr::case_when(
+          experiment_n == "1" ~ "1",
+          experiment_n == "3" ~ "2",
+          experiment_n == "4" ~ "3",
+          experiment_n == "5" ~ "4",
+          experiment_n == "6" ~ "5"
+          ))
+```
+
+### Summary statistics
+
+Checking summary statistics is a great way to understand the data and to potentially spot errors (e.g. very high or very low values). The summary() function is a quick and easy way to do this:
+
+```{r}
+# check the summary statistics of the different variables
+summary(raw_data)
+```
+
+In addition, it is typically useful to examine these summary statistics at their limits. Specifically, we want to figure out how sensitive these different metrics are to specific observations. One way to do this is to remove N observations and then check the summary statistics again. For example, I will check how sensitive the *Weight* and *SCP* means are to removing 3 random points.
+
+In this case, as you can see, the mean of *Weight* and *SCP* remains quite stable despite removing the data points. This suggests that certain values may not strongly affect the results.
+
+```{r}
+# how many observations to remove
+n <- 3
+
+# how many times to do this
+reps <- 10
+
+# set-up an output list
+sum_sens <- vector("list", length = reps)
+for (i in seq_along(sum_sens)) {
+  
+  remove <- sample(x = seq_len(nrow(raw_data)), size = n, replace = FALSE)
+  mean_data <-
+    raw_data[-remove, ] |>
+    dplyr::summarise(weight_mg_m = mean(weight_mg),
+                     scp_c_m = mean(scp_c))
+  
+  sum_sens[[i]] <- dplyr::bind_cols(dplyr::tibble(rep = i),
+                                    mean_data)
+  
+}
+
+# bind into a data.frame and view
+print(dplyr::bind_rows(sum_sens))
+
+```
+
+### Individual variables
+
+Let's examine individual variables, their distribution, how they compare across groups etc.
+
+#### weight_mg
+
+```{r}
+# distribution of weight
+ggplot(data = raw_data,
+       mapping = aes(x = weight_mg)) +
+  geom_histogram() +
+  theme_minimal()
+```
+
+```{r}
+# distribution of weight by species
+ggplot(data = raw_data,
+       mapping = aes(x = weight_mg, fill = species_name)) +
+  geom_histogram() +
+  theme_minimal()
+```
+
+```{r}
+# does weight vary by experiment
+ggplot(data = raw_data,
+       mapping = aes(x = experiment_n, y = weight_mg)) +
+  geom_point() +
+  theme_minimal()
+```
+
+```{r}
+# does weight vary by species?
+ggplot(data = raw_data,
+       mapping = aes(x = species_name, y = weight_mg)) +
+  geom_point() +
+  theme_minimal()
+```
+
+Based on this exploration, there do seem to be these three outlying values for species' weight. What could have caused this? Which row_ids are these? This might need to be built into the data cleaning pipeline.
+
+```{r}
+# check the row_ids: 19, 34, 25
+raw_data |>
+  dplyr::filter(weight_mg > 10)
+```
+
+#### scp_c
+
+```{r}
+# distribution of scp
+ggplot(data = raw_data,
+       mapping = aes(x = scp_c)) +
+  geom_histogram() +
+  theme_minimal()
+```
+
+```{r}
+# does scp vary by experiment
+ggplot(data = raw_data,
+       mapping = aes(x = experiment_n, y = scp_c)) +
+  geom_point() +
+  theme_minimal()
+```
+
+```{r}
+# does scp vary by species?
+ggplot(data = raw_data,
+       mapping = aes(x = species_name, y = scp_c)) +
+  geom_point() +
+  theme_minimal()
+```
+
+There are two quite strong outlier values. Perhaps these correspond to the very heavy individuals. No, they are actually different. Again, we should build this into the cleaning process.
+
+```{r}
+# which rows have these extreme values: 17, 31
+raw_data |>
+  dplyr::group_by(species_name) |>
+  dplyr::filter(scp_c == min(scp_c))
+```
+
+### Relationships among variables
+
+#### weight_mg, scp_c
+
+```{r}
+# correlation between weight, scp
+ggplot(data = raw_data,
+       mapping = aes(x = weight_mg, y = scp_c)) +
+  geom_point() +
+  theme_minimal()
+```
+
+```{r}
+# correlation between weight, scp within species
+ggplot(data = raw_data,
+       mapping = aes(x = weight_mg, y = scp_c, colour = species_name)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_minimal()
+```
+
+```{r}
+# correlation between weight, scp within experiment
+ggplot(data = raw_data,
+       mapping = aes(x = weight_mg, y = scp_c, colour = experiment_n)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  theme_minimal()
+```
+
+There does not seem to be much of a relationship between weight and scp. It could be different without those outliers? I really don't think so.

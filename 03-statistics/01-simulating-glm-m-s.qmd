@@ -1,0 +1,822 @@
+---
+title: "02-simulation-for-GLM(M)s"
+format: 
+  html:
+    math: mathjax
+editor: 
+  markdown: 
+    wrap: 100
+---
+
+```{r}
+# load relevant libraries
+library(lme4)
+library(lmerTest)
+library(ggplot2)
+library(dplyr)
+```
+
+## Simulation for GLM(M)s
+
+How many times have you sat with your data, googling, asking ChatGPT, pulling hair out trying to
+figure out which model to fit for your experiment/study? If you're like me, it's been a lot of
+times. How many times have you sat there thinking: Does this model even do what I think it's doing?
+Again, if you're like me, there have been many times.
+
+Now, what if I told you there was a way to solve these kinds of problems, improve reproducibility
+and your statistics skills? That solution is simulation.
+
+### Example N: Biodiversity in food forests
+
+There was a lively debate in our department recently about the correct way to analyse an experiment
+that examined how the *food-forest* land-use type affects biodiversity. Specifically, the
+researchers were interested in whether food forests had more biodiversity value than other land-use
+types (e.g. agricultural fields). The experiment was designed in the following way. There were 30
+locations throughout the Netherlands and Flanders (Belgium). At each of these 30 locations, there
+were two plots from the two groups i.e. food forest and agricultural field (there were actually four
+groups but, for simplicity, we will use two for this example). Within each of plots at each of the
+30 locations (i.e. $30 * 2 = 60$ plots), ten samples were randomly taken. Therefore, within each of
+the two plots at a given location, 10 individual biodiversity measurements were taken (i.e.
+$30 * 2 * 10 = 600$ measurements). For this analysis, we will view the agricultural field group as
+the *control* and the food forest group as the *treatment* but this could also reasonably be
+switched around. In this specific case, it does not matter.
+
+**Exercise**: How would you analyse these data?
+
+The resarcher proposed analysing these data using a linear mixed model (for simplicity, we will use
+a Gaussian error distribution but the same ideas apply to generalised linear models) with the
+following structure: biodiversity (B) \~ treatment (T) + (1 \| location (L) (I assume many of you
+have seen something like this before).
+
+But is this correct way to analyse these data? Let's think very carefully about what this model is
+assuming. Before we do this, we will write the model equation. Do not worry about this model
+equation for now. However, I wrote it here because we will want to come back to all the different
+parameters in this model.
+
+$$
+B_{ij} \sim Normal(\mu_{ij}, \sigma_{residual})\\
+\mu_{ij} = a_{j} + \beta_1(treatment_{i})\\
+\alpha_{j} \sim Normal(\mu_{global}, \sigma_{global}) \text{, for location j = 1,} \dots \text{,J}
+$$
+
+So, what does this model assume? It assumes that the control plots (i.e. the agricultural fields) at
+all 30 locations ($j$) have some base-level of biodiversity ($\alpha_j$). These base-level
+biodiversity values ($\alpha_j$) are normally distributed with some global mean ($\mu_{global}$) and
+global standard deviation ($\sigma_{global}$). The model then assumes that the treatment has the
+same effect in all 30 locations (i.e. the difference between food forest and agricultural fields is
+the same across the 30 locations). Based on the base-level biodiversity values at the 30 locations
+($\alpha_j$) and the treatment effect ($\beta_{1}$), the control (i.e. agricultural field) and
+treatment group (i.e. food forest) at each location have some mean value of biodiversity
+($\mu_{ij}$). The observed biodiversity values ($B_{ij}$) are normally distributed around these mean
+values ($\mu_{ij}$) for each location-group combination with some residual standard deviation
+($\sigma_{residual}$).
+
+Now we are going to simulate from this model and, I promise, this will become clearer. We went
+painfully through all the parameters in the model because the idea behind using simulation is to
+simulate these assumptions with specific parameter values, fit the model and then see if our model
+reproduces these parameter values. If the model cannot reproduce the parameters, then it means that
+our assumptions about how the model works are probably wrong.
+
+#### Simulation 1
+
+To start, we will specify the global mean ($\mu_{global}$) and the global standard deviation
+($\sigma_{global}$) of the normal distribution that describes the base-level of biodiversity at each
+location in the control group (i.e. the agricultural field). Let's visualise this:
+
+```{r}
+# set-up the global mean (mu_global = 100) and global standard deviation (sigma_global = 10)
+mu_global <- 100
+sigma_global <- 10
+
+# sample from this distribution and plot the results
+dist_global <- rnorm(n = 100000, mean = mu_global, sd = sigma_global)
+
+ggplot(mapping = aes(x = dist_global)) +
+  geom_density(fill = "grey", bw = 2.5) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ylab("Density") +
+  xlab("Biodiversity") +
+  theme_minimal()
+```
+
+In this experiment, we have 30 different locations. Therefore, we need to sample 30 times from this
+global distribution. These 30 samples are then the 30 base-level biodiversity values for the
+agricultural field plot (i.e. control plot) at each location ($\alpha_j$). We then visualise these
+30 location mean values as red vertical lines on the global distribution:
+
+```{r}
+# set the number of locations
+locations <- 30
+
+# take 15 random samples from the distribution
+a_j <- rnorm(n = locations, mean = mu_global, sd = sigma_global)
+
+ggplot() +
+  geom_density(mapping = aes(x = dist_global),
+               fill = "grey", bw = 2.5) +
+  geom_vline(mapping = aes(xintercept = a_j), colour = "red", size = 0.25) +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ylab("Density") +
+  xlab("Biodiversity") +
+  theme_classic()
+```
+
+So, now we have our 30 base-level biodiversity values for agricultural fields at the 30 locations
+($\alpha_j$). Let's visualise this in a different way that is more intuitive. Specifically, we plot
+each mean value on the y-axis and the x-axis simply indexes the 30 locations. Moreover, we plot the
+global mean as a red, dashed, horizontal line.
+
+```{r}
+# visualise the results as a location scatterplot
+ggplot() +
+  geom_point(mapping = aes(x = seq_along(a_j), y = a_j),
+             colour = "black", size = 2) +
+  geom_hline(yintercept = mu_global, colour = "red", linetype = "dashed") +
+  ylab("alpha j") +
+  xlab("Location j") +
+  theme_classic()
+```
+
+The next thing that this model assumes is that the base-level biodiversity value in the control
+group (i.e. the agricultural field) is modified by the treatment (i.e. the food forest treatment
+group) ($\beta_1$. Moreover, in this specific model formulation, the treatment effect is assumed to
+be constant across all 30 locations.
+
+We'll assume a treatment effect of 5 (i.e. $\beta_1 = 5$). This means that, on average, biodiversity
+in food forests will be greater than in the agricultural fields by 5 units (corresponds to 5%). We
+then add this treatment effect to all locations which gives us the mean biodiversity value at the 30
+locations for the food forest.
+
+```{r}
+# set the treatment effect
+b1 <- 5
+
+# add the treatment effect
+mu_ij <- a_j + b1
+
+# add the control plots to this vector
+mu_ij <- c(a_j, mu_ij)
+
+# pull into a data.frame
+dat_mu <- dplyr::tibble(location = rep(c(seq_len(locations)), 2),
+                        treatment = rep(c("agricultural: control", "food-forest: treatment"), each = locations),
+                        mu_ij = mu_ij)
+
+# visualise the results as a location scatterplot
+ggplot(data = dat_mu,
+       mapping = aes(x = location, y = mu_ij, colour = treatment)) +
+  geom_point() +
+  geom_hline(yintercept = mu_global, colour = "red", linetype = "dashed") +
+  ylab("mu ij") +
+  xlab("Location j") +
+  theme_classic()
+```
+
+So, now we have simulated the average biodiversity values in the control group (i.e. agricultural
+fields) and the average biodiversity values in the treatment group (i.e. food forests) as per the
+model (we hope). The last thing we need to do is simulate the *observed biodiversity value* i.e. the
+10 replicates in each plot in each location ($B_i$).
+
+To do this, we assume that the biodiversity values ($B_i$) are normally distributed around the means
+($\mu_{ij}$) with some standard deviation ($\sigma_{residual}$) which we will set at 5:
+
+```{r}
+# number of within-plot replicates
+replicates <- 10
+
+# set the residual standard deviation
+sigma_residual <- 5
+
+# simulate six replicates in each location-group combination
+dat_list <- vector("list", length = nrow(dat_mu)) 
+for (i in seq_along(dat_list)) {
+  
+  # extract the first location-group combination
+  x <- dat_mu[i, ]
+  
+  # simulate 6 random draws using the mean and residual standard deviation
+  y <- rnorm(n = replicates, mean = x$mu_ij, sd = sigma_residual)
+  
+  # add this to the data.frame
+  z <- dplyr::tibble(location = x$location,
+                     treatment = x$treatment,
+                     B_i = y)
+  
+  # add this to an output list
+  dat_list[[i]] <- z
+  
+}
+
+# bind into a data.frame
+dat <- dplyr::bind_rows(dat_list)
+
+```
+
+Now we have a fully simulated dataset which we can plot and which shows the simulated mean values as
+diamonds ($\mu_{ij}$) and the simulated observed biodiversity values as circles ($B_i$).
+
+```{r}
+# visualise the results as a location scatterplot
+ggplot() +
+  geom_point(data = dat_mu,
+             mapping = aes(x = location, y = mu_ij, colour = treatment), 
+             size = 3.5, shape = 18) +
+  geom_point(data = dat,
+             mapping = aes(x = location, y = B_i, colour = treatment),
+             alpha = 0.1) +
+  geom_hline(yintercept = mu_global, colour = "red", linetype = "dashed") +
+  ylab("mu ij") +
+  xlab("Location j") +
+  theme_classic()
+```
+
+Using this simulated dataset, we can fit the linear mixed model using the lme4 package and see if we
+can reproduce the parameter values that we put into the model.
+
+```{r}
+# check the structure of the data
+str(dat)
+
+# convert the location variable to a character
+dat$location <- as.character(dat$location)
+
+# fit the model
+lmm1 <- lmerTest::lmer(B_i ~ treatment + (1 | location), data = dat)
+
+# extract the summary
+lmm1_sum <- summary(lmm1)
+
+# print the summary
+print(lmm1_sum)
+```
+
+Now that we have fit the model, we can see if we can reproduce the parameters that we put into the
+model. Let's start with the global mean ($\mu_{global}$) and global standard deviation
+($\sigma_{global}$).
+
+We set the global mean ($\mu_{global}$) to 100. Therefore, we should obtain a value close to 100
+from our fitted model. To extract the mean, we need the intercept coefficient in this model. In this
+model, the estimated global mean was indeed very close to 100 (see below):
+
+```{r}
+# extract the global mean from the model: intercept term
+print(paste0("Estimated global mean: ", lmm1_sum$coefficients[1,1]))
+```
+
+What about the global standard deviation ($\sigma_{global}$) which we set at 10? Indeed, the
+estimated global standard deviation is 9.4, very close to the 10 that we simulated:
+
+```{r}
+# extract the random effects
+lmm1_re <- VarCorr(lmm1)
+
+# the relevant standard deviation is the location standard deviation
+x <- attr(lmm1_re$location, "stddev")
+names(x) <- NULL
+
+# extract the global mean from the model: intercept term
+print(paste0("Estimated global standard deviation: ", x))
+```
+
+What about the treatment effect ($B_1$)? We simulated a treatment effect of 5. Does the model
+reproduce this? Yes, it does.
+
+```{r}
+# extract the treatment effect from the model
+print(paste0("Estimated treatment effect: ", lmm1_sum$coefficients[2,1]))
+```
+
+And, what about the residual variation which we set at 5? This also matches very well with our
+simulation:
+
+```{r}
+# extract the global mean from the model: intercept term
+print(paste0("Estimated global standard deviation: ", lmm1_sum$sigma))
+```
+
+Finally, the model estimates a mean value for each location ($\alpha_j$). We can also check if these
+mean values match with simulated the mean values for each site.
+
+```{r}
+# extract the model coefficients
+lmm1_coef <- coef(lmm1)
+lmm1_coef <- lmm1_coef$location
+
+# get the rowname as a nummeric variable and sort
+lmm1_coef$location <- as.numeric(row.names(lmm1_coef))
+lmm1_coef <- dplyr::arrange(lmm1_coef, location)
+
+# how do these values correlate with the simulated values
+plot(a_j, lmm1_coef$`(Intercept)`)
+
+```
+
+Hopefully, this exercise has convinced you that we understand the behaviour of the model because we
+were able to directly simulate it and the model reproduced all the simulated parameters with high
+levels of accuracy. Also, it is worth going back and increasing the replication in this simulation
+using the *locations* and *replicates* objects. If you increase these, the estimates should get
+better and better.
+
+But, now that we understand the assumptions and behaviour, we may ask ourselves are these
+assumptions reasonable?
+
+**Exercise: Are there any assumptions about how this model works that you do not think make much
+sense?**
+
+#### Simulation 2
+
+In my view, the assumption that the treatment effect is the same across the different sites is
+problematic for this kind of study. No food forest is the same and no agricultural field is the
+same. Moreover, the locations cover a huge area with different environmental conditions which means
+that the biodiversity difference between a food forest and a grassland might be very different. By
+only fitting a single treatment effect parameter, the model is ignoring all of that variation and
+this can cause the significance of the effect to be inflated (Barr et al. 2013; Gelman and Brown
+2024). Rather, what we need to do, is model the potential variation in treatment effects among the
+locations. By doing this, we will obtain the average treatment effect across all 15 locations by
+directly modelling variation among locations.
+
+So what is different about this model compared to the previous model? Well, the only thing that
+differs is that we are now fitting a separate intercept and treatment effect for each location
+rather than simply a separate intercept for each location and a single treatment effect. Moreover,
+we will assume that the 15 intercepts and treatment effects are correlated. This just means that,
+for example, the model allows for the possibility that, for example, a high intercept is typically
+associated with a high (or low) treatment effect. As previously, I'm going to write the model
+equation out and then we will explore the assumptions of this model when we perform the simulation.
+
+$$
+B_{ij} \sim Normal(\mu_{ij}, \sigma_{\text{residual}})\\
+\mu_{ij} = \alpha_{j} + \beta_{j}(\text{treatment}_{i})\\
+\begin{pmatrix}
+\alpha_{j} \\
+\beta_{j}
+\end{pmatrix}
+\sim \mathcal{MVN} \left(
+\begin{pmatrix}
+\bar{\alpha} \\
+\bar{\beta}
+\end{pmatrix},
+\begin{pmatrix}
+\tau_{\alpha}^2 & \rho \tau_\alpha \tau_\beta \\
+\rho \tau_\alpha \tau_\beta & \tau_{\beta}^2
+\end{pmatrix}
+\right), \text{for location } j = 1, \dots, J
+$$
+
+So, what does this model assume? It assumes that the control plots (i.e. the agricultural fields) at
+all 15 locations ($j$) have some base-level of biodiversity ($\alpha_j$). This the same as the
+previous model. The model then assumes that the treatment (i.e. the difference between the food
+forest and the agricultural fields) differs across the 15 locations such that there is a separate
+treatment effect at each location ($\beta_{j}$). Therefore, based on the base-level biodiversity
+values at the 15 locations ($\alpha_j$) and the treatment effects at the 15 locations ($\beta_{j}$),
+the control (i.e. agricultural field) and treatment group (i.e. food forest) at each location have
+some mean value of biodiversity ($\mu_{ij}$). Importantly, the $\alpha_j$ and $\beta_j$ values come
+from a common multivariate normal distribution. The observed biodiversity values ($B_{ij}$) are
+normally distributed around these mean values ($\mu_{ij}$) for each location-group combination with
+some residual standard deviation ($\sigma_{residual}$).
+
+To start with, we need to define the parameters of the multivariate normal distribution. As with the
+previous simulation, we will assume that the global mean across locations is 100 ($\bar{\alpha_j}$)
+and that the standard deviation is 10 (variance is 100), ($\tau_{\alpha}^2$). Next, we assume that
+average treatment effect is 5 ($\bar{\beta_j}$) and that the standard deviation is 2.5 (variance =
+6.25) ($\tau_{\beta}^2$). Next, we assume that the $\alpha_j$ and $\beta_j$ values are correlated
+across locations with a correlation coefficient of 0.3 ($\rho$). Using these simulated values, we
+can draw pairs of $\alpha_j$ and $\beta_j$ values for each location from a multivariate normal
+distribution.
+
+```{r}
+# sim global mean (alpha_bar = 100) and variance (tau_alpha = 10)
+alpha_bar <- 100
+tau_alpha <- 10
+
+# sim global treatment effect mean (beta_bar = 5) and standard deviation (tau_beta = 2.5)
+beta_bar <- 5
+tau_beta <- 3
+
+# set the correlation coefficient
+rho <- 0.5
+
+# build the covariance matrix
+cov_mat <- matrix(data = c((tau_alpha^2), 
+                           rho*tau_alpha*tau_beta, 
+                           rho*tau_alpha*tau_beta, (tau_beta^2)), 2, 2)
+
+# simulate from the multivariate normal
+dist_global <- MASS::mvrnorm(n = 20000,
+                             mu = c(alpha_bar, beta_bar),
+                             Sigma = cov_mat)
+
+# plot this multivariate normal distribution
+dist_global <- dplyr::as_tibble(as.data.frame(dist_global))
+names(dist_global) <- c("a_j", "b_j")
+
+ggplot(data = dist_global,
+       mapping = aes(x = a_j, y = b_j)) +
+  geom_point() +
+  ylab("beta_j") +
+  xlab("alpha_j") +
+  theme_minimal()
+```
+
+This figure shows 20000 samples from the multivariate normal distribution that we set-up for
+$\alpha_j$ and $\beta_j$. As you can see, there values are correlated such that information from
+$\alpha_j$ can provide information about $\beta_j$. As this is the general distribution, we need to
+sample 15 locations from this which we overlay as red dots where each point represents both an
+$\alpha_j$ and $\beta_j$ for each location.
+
+```{r}
+# set the number of locations
+locations <- 30
+
+# simulate from the multivariate normal
+dist_samp <- MASS::mvrnorm(n = locations,
+                           mu = c(alpha_bar, beta_bar),
+                           Sigma = cov_mat)
+
+# plot this multivariate normal distribution
+dist_samp <- dplyr::as_tibble(as.data.frame(dist_samp))
+names(dist_samp) <- c("a_j", "b_j")
+
+ggplot() +
+  geom_point(data = dist_global,
+       mapping = aes(x = a_j, y = b_j)) +
+  geom_point(data = dist_samp,
+             mapping = aes(x = a_j, y = b_j), colour = "red", size = 3.5) +
+  ylab("beta_j") +
+  xlab("alpha_j") +
+  theme_minimal()
+```
+
+Using these sampled values of $\alpha_j$ and $\beta_j$, we can now build a dataset with the means of
+each control and treatment plot at each location ($\mu_{ij}$). Let's visualise this.
+
+```{r}
+# build a data.frame with the simulated means
+dat_mu <- 
+  dplyr::tibble(location = rep(c(seq_len(locations)), 2),
+                treatment = rep(c("agricultural: control", "food-forest: treatment"),
+                                each = locations),
+                mu_ij = c(dist_samp$a_j, (dist_samp$a_j + dist_samp$b_j)))
+head(dat_mu)
+
+# visualise the results as a location scatterplot
+ggplot(data = dat_mu,
+       mapping = aes(x = location, y = mu_ij, colour = treatment)) +
+  geom_point() +
+  ylab("mu ij") +
+  xlab("Location j") +
+  theme_classic()
+```
+
+As with the previous model, now that we have the simulated the average biodiversity values in the
+control group (i.e. agricultural fields) and the average biodiversity values in the treatment group
+(i.e. food forests), the last thing we need to do is simulate the *observed biodiversity value* i.e.
+the 6 replicates in each plot in each location ($B_i$).
+
+To do this, we assume that the biodiversity values ($B_i$) are normally distributed around the means
+($\mu_{ij}$) with some standard deviation ($\sigma_{residual}$) which we will set at 5:
+
+```{r}
+# number of within-plot replicates
+replicates <- 10
+
+# set the residual standard deviation
+sigma_residual <- 5
+
+# simulate six replicates in each location-group combination
+dat_list <- vector("list", length = nrow(dat_mu)) 
+for (i in seq_along(dat_list)) {
+  
+  # extract the first location-group combination
+  x <- dat_mu[i, ]
+  
+  # simulate 6 random draws using the mean and residual standard deviation
+  y <- rnorm(n = replicates, mean = x$mu_ij, sd = sigma_residual)
+  
+  # add this to the data.frame
+  z <- dplyr::tibble(location = x$location,
+                     treatment = x$treatment,
+                     B_i = y)
+  
+  # add this to an output list
+  dat_list[[i]] <- z
+  
+}
+
+# bind into a data.frame
+dat <- dplyr::bind_rows(dat_list)
+
+```
+
+```{r}
+# fit the model with correlated random intercepts and slopes
+lmm2 <- lmerTest::lmer(B_i ~ treatment + (1 + treatment | location), data = dat)
+summary(lmm2)
+```
+
+### Functions to repeat these simulations
+
+Now, we want to test the behaviour of these models over many replicate simulations. To do this, I
+have wrapped the code for simulation 2 into a function that will allow us to do this. The code is
+very similar but is now more streamlined and allows one to easily run the simulation with different
+parameter values.
+
+```{r}
+# sim_lmm: fit lmm1 and lmm2 to simulated data
+sim_lmm <- function(alpha_bar = 100, tau_alpha = 10, beta_bar = 5, tau_beta = 3, 
+                     rho = 0.5, locations = 30, replicates = 10, sigma_residual = 5) {
+  
+  # Load required libraries
+  if (!requireNamespace("dplyr", quietly = TRUE)) stop("Package 'dplyr' is required.")
+  if (!requireNamespace("lmerTest", quietly = TRUE)) stop("Package 'lmerTest' is required.")
+  if (!requireNamespace("MASS", quietly = TRUE)) stop("Package 'MASS' is required.")
+  
+  # Build the covariance matrix
+  cov_mat <- matrix(c(tau_alpha^2, rho * tau_alpha * tau_beta, 
+                      rho * tau_alpha * tau_beta, tau_beta^2), 
+                    nrow = 2, ncol = 2)
+  
+  # Simulate from the multivariate normal distribution
+  dist_samp <- MASS::mvrnorm(n = locations, mu = c(alpha_bar, beta_bar), Sigma = cov_mat)
+  
+  # Convert to tibble and name columns
+  dist_samp <- dplyr::as_tibble(as.data.frame(dist_samp))
+  names(dist_samp) <- c("a_j", "b_j")
+  
+  # Build the data frame with simulated means
+  dat_mu <- 
+    dplyr::tibble(
+    location = rep(seq_len(locations), 2),
+    treatment = rep(c("control", "treatment"), each = locations),
+    mu_ij = c(dist_samp$a_j, dist_samp$a_j + dist_samp$b_j)
+  )
+  
+  # Simulate replicates for each location-treatment combination
+  dat <- 
+    dat_mu |> 
+    dplyr::rowwise() |>
+    dplyr::mutate(
+      B_i = list(rnorm(n = replicates, mean = mu_ij, sd = sigma_residual))
+    ) |> 
+    dplyr::select(location, treatment, B_i) |>
+    tidyr::unnest(cols = c(B_i))
+  
+  # Convert location variable to character
+  dat$location <- as.character(dat$location)
+  
+  # Fit the linear mixed model with a random intercept only
+  lmm1 <- lmerTest::lmer(B_i ~ treatment + (1 | location), data = dat)
+  
+  # Fit the linear mixed model with correlated random intercepts and slopes
+  lmm2 <- lmerTest::lmer(B_i ~ treatment + (1 + treatment | location), data = dat)
+  
+  # Return the simulated data and the fitted model
+  list(model1 = lmm1,
+       model2 = lmm2)
+  
+}
+```
+
+So, let's see how this function works. We will run a single replicate simulation (i.e. simulation 2
+where treatment effects vary across locations) and fit both models (model1 and model2 respectively).
+This should convince you that the models are similar to what we have already done. Moreover, feel
+free to adjust some of the parameters and see what happens. For example, if you increase the number
+of locations (i.e. *locations*) and the number of replicates within each location (i.e.
+*replicates*), you should get estimates that are closer to the true, simulated parameter values.
+
+```{r}
+# run one replicate of the second simulation
+sim2_obj <- sim_lmm(alpha_bar = 100, tau_alpha = 10, beta_bar = 5, tau_beta = 3, 
+                    rho = 0.3, locations = 30, replicates = 10, sigma_residual = 5)
+summary(sim2_obj$model1)
+summary(sim2_obj$model2)
+```
+
+### Comparison of the two models
+
+What was our question at the start? Well, we wanted to determine which model we should use (model 1
+i.e. random intercept or model 2 i.e. correlated random intercept and random slope). I hope I've
+convinced you that the assumptions of model 1 that the treatment effect is the same across all
+locations is not very realistic and that model 2, which allows the treatment effect to vary across
+locations is more realistic. Now, let's use simulation 2 where the treatment effect varies across
+locations and compare the inference we get from the two models. To do this, we will simulate 1000
+replicates of simulation 2 and compare the resulting t-values for the treatment effect for models 1
+and 2.
+
+```{r}
+sim_reps <- vector("list", length = 1000)
+for (i in seq_along(sim_reps)) {
+
+  # run one replicate of the second simulation (i.e. correlated random intercepts and slopes)
+  sim_obj <- sim_lmm(alpha_bar = 100, tau_alpha = 10, beta_bar = 5, tau_beta = 3, 
+                     rho = 0.3, locations = 30, replicates = 10, sigma_residual = 5)
+  
+  # extract the model objects
+  sim1_sum <- summary(sim_obj$model1)
+  sim2_sum <- summary(sim_obj$model2)
+  
+  # extract the t-values for the treatment
+  sim1_t <- coefficients(sim1_sum)[2, 4]
+  sim2_t <- coefficients(sim2_sum)[2, 4]
+  
+  # extract the p-value for the treatment
+  sim1_p <- coefficients(sim1_sum)[2, 5]
+  sim2_p <- coefficients(sim2_sum)[2, 5]
+  
+  # bind into a data.frame
+  sim_reps[[i]] <- dplyr::tibble(rep = i,
+                                 sim = c(1, 2),
+                                 t_val = c(sim1_t, sim2_t),
+                                 p_val = c(sim1_p, sim2_p))
+  
+}
+
+# bind into a data.frame
+sim_rep_df <- dplyr::bind_rows(sim_reps)
+```
+
+Now, we can compare the t-values between the two models on the same simulated data where the
+treatment effect varied between locations. What we see is that the t-values are consistently higher
+in model 1. This is because the model is ignoring the variation among locations. Model 2 is less
+certain about the treatment effect because it *knows* that there is variation. Indeed, the fact that
+the t-value for the treatment effect in model 1 is extremely high (on average 12) should raise some
+alarm bells.
+
+```{r}
+# compare the t-values between the two simulations
+ggplot(data = sim_rep_df,
+       mapping = aes(x = t_val, fill = as.character(sim))) +
+  geom_density(alpha = 0.5, bw = 0.7) +
+  theme_classic()
+```
+
+In my view, the only time when model 1 would be appropriate is if there is only one replicate per
+site in which case the experiment becomes a randomised block design. The model would then not be
+able to properly estimate the varying slope effects across locations. The other case is if there is
+no variation among locations in the treatment effect. Let's do this by simply setting the slope
+variation to zero. What happens in this case, is that the more complex model 2 becomes very similar
+to model 1. Moreover, the model will probably complain because of some numerical problems (e.g.
+boundary fit singular). This occurs because the model is trying to estimate the variation in beta
+but it is simply not there.
+
+```{r}
+sim_reps <- vector("list", length = 1000)
+for (i in seq_along(sim_reps)) {
+
+  # run one replicate of the second simulation (i.e. correlated random intercepts and slopes)
+  sim_obj <- sim_lmm(alpha_bar = 100, tau_alpha = 10, beta_bar = 5, tau_beta = 0, 
+                     rho = 0, locations = 30, replicates = 10, sigma_residual = 5)
+  
+  # extract the model objects
+  sim1_sum <- summary(sim_obj$model1)
+  sim2_sum <- summary(sim_obj$model2)
+  
+  # extract the t-values for the treatment
+  sim1_t <- coefficients(sim1_sum)[2, 4]
+  sim2_t <- coefficients(sim2_sum)[2, 4]
+  
+  # extract the p-value for the treatment
+  sim1_p <- coefficients(sim1_sum)[2, 5]
+  sim2_p <- coefficients(sim2_sum)[2, 5]
+  
+  # bind into a data.frame
+  sim_reps[[i]] <- dplyr::tibble(rep = i,
+                                 sim = c(1, 2),
+                                 t_val = c(sim1_t, sim2_t),
+                                 p_val = c(sim1_p, sim2_p))
+  
+}
+
+# bind into a data.frame
+sim_rep_df <- dplyr::bind_rows(sim_reps)
+```
+
+```{r}
+# compare the t-values between the two simulations
+ggplot(data = sim_rep_df,
+       mapping = aes(x = t_val, fill = as.character(sim))) +
+  geom_density(alpha = 0.5, bw = 0.7) +
+  theme_classic()
+```
+
+All of this is to say that, in this case, these simulations indicate that using model 2 is a more
+appropriate analysis. The only time that model 1 would become more appropriate is if there was only
+a single replicate per site or if there was very little variation in the treatment effect among
+locations. This is almost certainly not the case given this kind of field experiment. Moreover, even
+if this did turn out to be the case, it would still be better to try and model the variation in
+treatment effects and, only if the model was unable to fit, to use the simpler model.
+
+This post was inspired by two great papers that helped me understand this varying intercept/varying
+slope distinction which are both well-worth reading. They are talking from a psychology perspective
+but similar problems apply to the ecological literature:
+
+-   Gelman and Brown (2024): http://www.stat.columbia.edu/\~gelman/research/published/healing3.pdf
+-   Barr et al. (2013): https://www.sciencedirect.com/science/article/pii/S0749596X12001180
+
+### Bonus round...
+
+In this case, I made the simplifying assumption that the biodiversity variable was continuous and
+normally distributed. However, very few measures of biodiversity are actually like this... Take
+species richness, for example, this is probably more appropriate modelled as a Poisson random
+variable. We are now going to repeat Simulation 2 but using a Poisson generalised linear mixed model
+to show you what this looks like.
+
+Like previously, we are going to write the equation. As you can, the model is very similar. The only
+difference is that the observed biodiversity ($B_{ij}$) is Poisson distributed around some
+($\lambda_{ij}$). Moreover, the $\alpha_{j}$ and $\beta_{j}$ parameters determine the
+$log(\lambda_{ij}$ value. This ensures that the $\lambda_{ij}$ values are positive and that the
+linear model goes from negative infinity to positive infinity.
+
+$$
+B_{ij} \sim \text{Poisson}(\lambda_{ij}) \\
+\log(\lambda_{ij}) = \alpha_{j} + \beta_{j}(treatment_{i}) \\
+\begin{pmatrix}
+\alpha_{j} \\
+\beta_{j}
+\end{pmatrix}
+\sim \mathcal{MVN} \left(
+\begin{pmatrix}
+\bar{\alpha} \\
+\bar{\beta}
+\end{pmatrix}
+,
+\begin{pmatrix}
+\tau_{\alpha}^2 & \rho \tau_\alpha \tau_\beta \\
+\rho \tau_\alpha \tau_\beta & \tau_{\beta}^2
+\end{pmatrix}
+\right), \text{ for location } j = 1, \dots, J
+$$
+
+Given the similarity in the equation, the simulation is very similar as well.
+
+```{r}
+# set the mean species richness value across locations
+alpha_bar = log(100)
+
+# set the variation in species richness across locations
+tau_alpha = log(100)/10
+print(tau_alpha)
+
+# set the treatment effect
+beta_bar = log(5)
+
+# set the variation in the treatment effect
+tau_beta = log(5)/2
+
+# set the correlation between beta_j and alpha_j
+rho = 0.5
+
+# set the number of locations
+locations = 1000
+
+# set the number of replicates within each site (two sites per location)
+replicates = 50
+  
+# Build the covariance matrix
+cov_mat <- matrix(c(tau_alpha^2, rho * tau_alpha * tau_beta, 
+                  rho * tau_alpha * tau_beta, tau_beta^2), 
+                  nrow = 2, ncol = 2)
+  
+# Simulate from the multivariate normal distribution
+dist_samp <- MASS::mvrnorm(n = locations, mu = c(alpha_bar, beta_bar), Sigma = cov_mat)
+  
+# Convert to tibble and name columns
+dist_samp <- dplyr::as_tibble(as.data.frame(dist_samp))
+names(dist_samp) <- c("a_j", "b_j")
+  
+# Build the data frame with simulated means
+dat_mu <- 
+  dplyr::tibble(
+  location = rep(seq_len(locations), 2),
+  treatment = rep(c("control", "treatment"), each = locations),
+  mu_ij = c(dist_samp$a_j, dist_samp$a_j + dist_samp$b_j)
+  )
+
+```
+
+But, things change when we have to simulated the observed biodiversity values. For this, we take the
+exponentiated $\mu_{ij}$ value and pass it through the Poisson distribution to generate the observed
+biodiversity values ($B_{ij}$).
+
+```{r}
+# Simulate species richness replicates for each location-treatment combination
+dat <- 
+  dat_mu |> 
+  dplyr::rowwise() |>
+  dplyr::mutate(
+    B_i = list(rpois(n = replicates, lambda = exp(mu_ij)))
+    ) |> 
+  dplyr::select(location, treatment, B_i) |>
+  tidyr::unnest(cols = c(B_i))
+  
+# Convert location variable to character
+dat$location <- as.character(dat$location)
+  
+# Fit the linear mixed model with correlated random intercepts and slopes
+glmm1 <- lme4::glmer(B_i ~ treatment + (1 + treatment | location), 
+                     family=poisson(link = log), data = dat)
+
+# check the object
+summary(glmm1)
+```

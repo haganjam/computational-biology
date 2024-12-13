@@ -114,9 +114,7 @@ $$
 P_{ij} \sim Normal(\mu_{ij}, \sigma_{residual})
 $$ $$
 \mu_{ij} = \alpha_{j} + \beta_1\text{S}_{i} + \beta_2\text{W}_{i} + \beta_3\text{S}_{i}\text{W}_{i}
-$$
-
-$$
+$$ $$
 \alpha_{j} \sim Normal(\bar{\alpha}, \tau_{\bar{\alpha}}) \text{, for experiment j = 1,} \dots \text{,J}
 $$
 
@@ -293,18 +291,18 @@ summary(lm_weight)
 
     Residuals:
         Min      1Q  Median      3Q     Max 
-    -3.4008 -0.6674  0.0317  0.6500  3.1043 
+    -3.0319 -0.7003  0.0138  0.6604  3.5808 
 
     Coefficients:
                 Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)  8.56344    0.03163   270.8   <2e-16 ***
-    S           -3.54249    0.04473   -79.2   <2e-16 ***
+    (Intercept)  8.44588    0.03153  267.85   <2e-16 ***
+    S           -3.45008    0.04459  -77.37   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-    Residual standard error: 1 on 1998 degrees of freedom
-    Multiple R-squared:  0.7584,    Adjusted R-squared:  0.7583 
-    F-statistic:  6273 on 1 and 1998 DF,  p-value: < 2.2e-16
+    Residual standard error: 0.9971 on 1998 degrees of freedom
+    Multiple R-squared:  0.7497,    Adjusted R-squared:  0.7496 
+    F-statistic:  5986 on 1 and 1998 DF,  p-value: < 2.2e-16
 
 Now that we have the *Species*, *Experiment* and *Weight* variables (all
 the parents of *SCP*), we can simulate the *SCP* values. As mentioned
@@ -394,13 +392,9 @@ from above):
 
 $$
 P_{ij} \sim Normal(\mu_{ij}, \sigma_{residual})
-$$
-
-$$
+$$ $$
 \mu_{ij} = \alpha_{j} + \beta_1\text{S}_{i} + \beta_2\text{W}_{i} + \beta_3\text{S}_{i}\text{W}_{i}
-$$
-
-$$
+$$ $$
 \alpha_{j} \sim Normal(\bar{\alpha}, \tau_{\bar{\alpha}}) \text{, for experiment j = 1,} \dots \text{,J}
 $$ Now, we will simulate the *SCP* values using these data ($P_{ij}$):
 
@@ -429,30 +423,30 @@ summary(lmm_P)
     Linear mixed model fit by REML ['lmerMod']
     Formula: P ~ S + W + S:W + (1 | E)
 
-    REML criterion at convergence: 5789
+    REML criterion at convergence: 5790
 
     Scaled residuals: 
          Min       1Q   Median       3Q      Max 
-    -3.11461 -0.66753  0.00372  0.66770  2.86967 
+    -2.99453 -0.65867 -0.01795  0.69483  3.06771 
 
     Random effects:
      Groups   Name        Variance Std.Dev.
-     E        (Intercept) 0.3533   0.5944  
-     Residual             0.9819   0.9909  
+     E        (Intercept) 0.2227   0.4719  
+     Residual             0.9929   0.9964  
     Number of obs: 2000, groups:  E, 50
 
     Fixed effects:
                 Estimate Std. Error t value
-    (Intercept) -7.30387    0.29301 -24.927
-    S           -2.72368    0.32296  -8.433
-    W           -0.22736    0.03258  -6.978
-    S:W         -0.01741    0.04502  -0.387
+    (Intercept) -7.27077    0.26947 -26.982
+    S           -2.56143    0.31054  -8.248
+    W           -0.22515    0.03069  -7.336
+    S:W         -0.04680    0.04523  -1.035
 
     Correlation of Fixed Effects:
         (Intr) S      W     
-    S   -0.834              
-    W   -0.952  0.865       
-    S:W  0.691 -0.959 -0.726
+    S   -0.811              
+    W   -0.962  0.832       
+    S:W  0.648 -0.957 -0.675
 
 Inspecting these parameter values, we can see that they match closely
 with the parameter values that we set in our simulation. This means that
@@ -524,7 +518,7 @@ of each species across 10 experiments. Moreover, we set the alpha value
 
 ``` r
 # how many replicate simulations?
-n_sim <- 10
+n_sim <- 1000
 
 # set the parameters: beta_1_H0 and beta_1_HA (i.e. null and alternative hypotheses)
 par_df <- dplyr::tibble(alpha_rej = 0.05, 
@@ -576,7 +570,23 @@ for (i in seq_len(n_sim)) {
     }
   
 }
-  
+```
+
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+
+``` r
 # simulate under H0
 for (i in seq_len(n_sim)) {
 
@@ -614,7 +624,17 @@ for (i in seq_len(n_sim)) {
     }
   
 }
+```
 
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+    boundary (singular) fit: see help('isSingular')
+
+``` r
 # calculate the type I error rate across simulations
 type_I_error_rate <- sum(type_I_errors, na.rm = TRUE) / length(na.omit(type_I_errors))
 
@@ -631,9 +651,9 @@ cat(paste0("\n", " Type I error: ", round(type_I_error_rate, 2), "\n"),
 ```
 
 
-     Type I error: 0
-     Type II error: 0.2
-     Power: 0.8
+     Type I error: 0.06
+     Type II error: 0.36
+     Power: 0.64
 
 Based on these simulations, the Type I error rate (i.e. chance of
 rejecting the null hypothesis when it is true) is around 0.04. We expect
@@ -769,7 +789,7 @@ for (i in seq_along(power_list)) {
   input_pars <- par_grid[i, ]
   
   # run the simulation
-  power_sim_data <- run_power_analysis(n_sim = 100, alpha_rej = 0.05, 
+  power_sim_data <- run_power_analysis(n_sim = 1000, alpha_rej = 0.05, 
                                        beta_1_H0 = 0, beta_1_HA = input_pars$beta_1_HA_par,
                                        n_f = input_pars$n_flies_par, n_p = input_pars$n_flies_par, 
                                        n_exp = input_pars$n_exp_par, 
@@ -789,7 +809,65 @@ for (i in seq_along(power_list)) {
                                     power = power_sim_data$power)
   
 }
+```
 
+    Warning in checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv, :
+    Model failed to converge with max|grad| = 0.00219571 (tol = 0.002, component 1)
+
+    Warning in checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv, :
+    Model failed to converge with max|grad| = 0.00235468 (tol = 0.002, component 1)
+
+    Warning: Model failed to converge with 1 negative eigenvalue: -1.3e+00
+
+    Warning in checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv, :
+    Model failed to converge with max|grad| = 0.00206155 (tol = 0.002, component 1)
+
+    Warning in checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv, :
+    Model failed to converge with max|grad| = 0.00236447 (tol = 0.002, component 1)
+
+    Warning in checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv, :
+    Model failed to converge with max|grad| = 0.00322668 (tol = 0.002, component 1)
+
+    Warning in checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv, :
+    Model failed to converge with max|grad| = 0.00222941 (tol = 0.002, component 1)
+
+    Warning: Model failed to converge with 1 negative eigenvalue: -1.6e-01
+
+    Warning in checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv, :
+    Model failed to converge with max|grad| = 0.00284506 (tol = 0.002, component 1)
+
+    Warning in checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv, :
+    Model failed to converge with max|grad| = 0.00228369 (tol = 0.002, component 1)
+
+    Warning: Model failed to converge with 1 negative eigenvalue: -1.4e-01
+
+    Warning in checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv, :
+    Model failed to converge with max|grad| = 0.00266263 (tol = 0.002, component 1)
+
+    Warning in checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv, :
+    Model failed to converge with max|grad| = 0.00206577 (tol = 0.002, component 1)
+
+    Warning in checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv, :
+    Model failed to converge with max|grad| = 0.0026497 (tol = 0.002, component 1)
+
+    Warning: Model failed to converge with 1 negative eigenvalue: -8.5e-02
+
+    Warning: Model failed to converge with 1 negative eigenvalue: -1.3e-02
+
+    Warning in checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv, :
+    Model failed to converge with max|grad| = 0.00232928 (tol = 0.002, component 1)
+
+    Warning in checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv, :
+    Model failed to converge with max|grad| = 0.00231426 (tol = 0.002, component 1)
+
+    Warning: Model failed to converge with 1 negative eigenvalue: -1.4e-01
+
+    Warning in checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv, :
+    Model failed to converge with max|grad| = 0.00287963 (tol = 0.002, component 1)
+
+    Warning: Model failed to converge with 1 negative eigenvalue: -3.8e-01
+
+``` r
 # bind into a data.frame
 power_data <- dplyr::bind_rows(power_list)
 ```

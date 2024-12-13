@@ -24,8 +24,157 @@ head(clean_data)
 ```{r}
 # convert species_abb to a factor and re-level
 clean_data$species_abb <- factor(clean_data$species_abb, levels = c("P", "F"))
-print(clean_data$species_abb)
+
+# add an additional dummy variable which facilitates the simulation
+clean_data$species_dummy <- ifelse(clean_data$species_abb == "P", 0, 1)
 ```
+
+```{r}
+# linear model of weight as a function of species
+lm_weight <- lm(weight_mg ~ species_abb, data = clean_data)
+
+# print the model summary
+lm_weight_sum <- summary(lm_weight)
+
+# print the model summary
+print(lm_weight_sum)
+```
+
+```{r}
+# fit the model
+lm1 <- lm(scp_c ~ species_abb + weight_mg + species_abb:weight_mg, 
+          data = clean_data)
+
+# extract the summary
+lm1_sum <- summary(lm1)
+
+# print the fitted model
+print(lm1)
+```
+
+```{r}
+# simulate from the data generating process
+
+# extract the species dummy
+S <- clean_data$species_dummy
+
+# weight model: extract estimated parameters
+theta_est <- coef(lm_weight)[1]
+b_species_est <- coef(lm_weight)[2]
+sigma_weight_est <- lm_weight_sum$sigma
+
+# scp model: extract estimated parameters
+alpha_est <- coef(lm1)[1]
+beta_1_est <- coef(lm1)[2]
+beta_2_est <- coef(lm1)[3]
+beta_3_est <- coef(lm1)[4]
+sigma_residual_est <- lm1_sum$sigma
+```
+
+```{r}
+# function to simulate data under null hypotheses and compare
+simulate_beta_1 <- function(beta_1_H0 = 0, beta_1_HA, beta_1_obs,
+                            n_sim = 1000) {
+  
+  # make vectors to capture the null and alternative slopes
+  beta_1_sim_null <- vector(length = n_sim)
+  beta_1_sim_alt <- vector(length = n_sim)
+  
+  # run n_sim simulations
+  for (i in seq_along(beta_1_sim_null)) {
+    
+    # weight model
+    
+    # simulate the gamma values (i.e. conditional expectations)
+    gamma_i_est <- theta_est + (b_species_est*S)
+
+    # draw values from a normal distribution
+    W_sim <- rnorm(n = length(gamma_i_est), mean = gamma_i_est, sd = sigma_weight_est)
+    
+    # scp model
+    
+    # null hypothesis
+    
+    # simulate the u_ij values
+    mu_ij_null <- alpha_est + (beta_1_H0 * S) + (beta_2_est * W_sim) + (beta_3_est * S * W_sim)
+
+    # simulate the P_ij values from the normal distribution
+    P_sim_null <- rnorm(n = length(mu_ij_null), mean = mu_ij_null, sd = sigma_residual)
+    
+    # alternative claim
+    
+    # simulate the u_ij values
+    mu_ij_alt <- alpha_est + (beta_1_HA * S) + (beta_2_est * W_sim) + (beta_3_est * S * W_sim)
+
+    # simulate the P_ij values from the normal distribution
+    P_sim_alt <- rnorm(n = length(mu_ij_alt), mean = mu_ij_alt, sd = sigma_residual)
+    
+    # wrap the model into a data.frame
+    data_sim <- data.frame(S = S,
+                           W_sim = W_sim,
+                           P_sim_null = P_sim_null,
+                           P_sim_alt = P_sim_alt)
+    
+    # fit the model to the simulated data under the null hypothesis
+    fit_sim_null <- lm(P_sim_null ~ S + W_sim + S:W_sim, data = data_sim)
+    
+    # fit the model to the simulated data under the alternative hypothesis
+    fit_sim_alt <- lm(P_sim_alt ~ S + W_sim + S:W_sim, data = data_sim)
+    
+    # store the slope estimate under the null
+    beta_1_sim_null[i] <- coef(fit_sim_null)[2]
+    
+    # store the slope estimate under the alternative
+    beta_1_sim_alt[i] <- coef(fit_sim_alt)[2]
+  
+  }
+  
+  # calculate the relevant metrics
+  
+  # probability of observing values less than beta_1_obs under the null hypothesis
+  p_null <- 1 - (sum(beta_1_obs < beta_1_sim_null)/n_sim)
+  
+  # probability of observing values less than beta_1_obs under the alternative hypothesis
+  p_HA <- 1 - (sum(beta_1_obs < beta_1_sim_alt)/n_sim)
+  
+  # severity: probability of observing values 
+  p_sev <- 1 - p_HA
+  
+  # wrap the full data into a list
+  list(p_null = p_null,
+       p_sev = p_sev,
+       beta_1_sim_null = beta_1_sim_null,
+       beta_1_sim_alt = beta_1_sim_alt)
+  
+  }
+```
+
+
+```{r}
+sim_out <- simulate_beta_1(beta_1_H0 = 0, beta_1_HA = -3, beta_1_obs = beta_1_est,
+                           n_sim = 10000)
+```
+
+```{r}
+sim_out$p_null
+sim_out$p_sev
+```
+
+
+```{r}
+library(ggplot2)
+ggplot() +
+  geom_density(mapping = aes(x = sim_out$beta_1_sim_null),
+               fill = "red", alpha = 0.25) +
+  geom_density(mapping = aes(x = sim_out$beta_1_sim_alt),
+               fill = "green", alpha = 0.25) +
+  geom_vline(xintercept = beta_1_est)
+
+```
+
+
+
+
 
 
 

@@ -77,7 +77,6 @@ $$
 $$
 \mu_{ij} = \alpha_{j} + \beta_1\text{S}_{i} + \beta_2\text{W}_{i} + \beta_3\text{S}_{i}\text{W}_{i}
 $$
-
 $$
 \alpha_{j} \sim Normal(\bar{\alpha}, \tau_{\bar{\alpha}}) \text{, for experiment j = 1,} \dots \text{,J}
 $$
@@ -242,11 +241,9 @@ Using prior information (literature and pilot data), we have placed realistic va
 $$
 P_{ij} \sim Normal(\mu_{ij}, \sigma_{residual})
 $$
-
 $$
 \mu_{ij} = \alpha_{j} + \beta_1\text{S}_{i} + \beta_2\text{W}_{i} + \beta_3\text{S}_{i}\text{W}_{i}
 $$
-
 $$
 \alpha_{j} \sim Normal(\bar{\alpha}, \tau_{\bar{\alpha}}) \text{, for experiment j = 1,} \dots \text{,J}
 $$
@@ -319,7 +316,7 @@ Using this function, we will simulate multiple datasets and then test how freque
 
 ```{r}
 # how many replicate simulations?
-n_sim <- 10
+n_sim <- 1000
 
 # set the parameters: beta_1_H0 and beta_1_HA (i.e. null and alternative hypotheses)
 par_df <- dplyr::tibble(alpha_rej = 0.05, 
@@ -540,7 +537,7 @@ for (i in seq_along(power_list)) {
   input_pars <- par_grid[i, ]
   
   # run the simulation
-  power_sim_data <- run_power_analysis(n_sim = 100, alpha_rej = 0.05, 
+  power_sim_data <- run_power_analysis(n_sim = 1000, alpha_rej = 0.05, 
                                        beta_1_H0 = 0, beta_1_HA = input_pars$beta_1_HA_par,
                                        n_f = input_pars$n_flies_par, n_p = input_pars$n_flies_par, 
                                        n_exp = input_pars$n_exp_par, 

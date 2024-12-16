@@ -15,8 +15,8 @@ The objective of this project is to assess the cold tolerance of two coexisting 
 
 *Coleopa frigida* and *Coleopa pilipes* are commonly found in the brown algae wrack beds that accumulate along European shorelines. These wrack beds serve as both habitat and food source for these species. Despite overlapping in much of Northern Europe, the species exhibit distinct geographic distributions:
 
-- *C. frigida* is predominant at higher latitudes in the north.
-- *C. pilipes* is more common at lower latitudes in the south.
+-   *C. frigida* is predominant at higher latitudes in the north.
+-   *C. pilipes* is more common at lower latitudes in the south.
 
 Given these distribution patterns, it is hypothesized that *C. frigida* may exhibit a higher tolerance to cold compared to *C. pilipes*. This hypothesis remains largely untested, and this study aims to fill that gap.
 
@@ -30,13 +30,14 @@ Seaweed flies will be collected from brown algae wrack beds in the Tjärnö Arch
 
 All seaweed flies collected on a given day will be processed in the lab as follows:
 
-1. **Weighing**  
-   Each individual fly will be weighed to record its mass.
+1.  **Weighing**\
+    Each individual fly will be weighed to record its mass.
 
-2. **Supercooling Point (SCP) Measurement**  
-   - The supercooling point (SCP) of each fly will be measured using a thermocouple.
-   - The SCP is defined as the temperature at which ice formation begins in the organism’s body. 
-   - SCP is a critical metric for assessing cold tolerance, as many insects lower their SCP by accumulating antifreeze compounds, such as sugars and polyols.
+2.  **Supercooling Point (SCP) Measurement**
+
+    -   The supercooling point (SCP) of each fly will be measured using a thermocouple.
+    -   The SCP is defined as the temperature at which ice formation begins in the organism's body.
+    -   SCP is a critical metric for assessing cold tolerance, as many insects lower their SCP by accumulating antifreeze compounds, such as sugars and polyols.
 
 ### Sampling Timeline
 
@@ -73,10 +74,12 @@ In addition, if we adjust for *Experiment*, we can improve the precision of our 
 
 $$
 P_{ij} \sim Normal(\mu_{ij}, \sigma_{residual})
-$$
+$$ 
+
 $$
 \mu_{ij} = \alpha_{j} + \beta_1\text{S}_{i} + \beta_2\text{W}_{i} + \beta_3\text{S}_{i}\text{W}_{i}
-$$
+$$ 
+
 $$
 \alpha_{j} \sim Normal(\bar{\alpha}, \tau_{\bar{\alpha}}) \text{, for experiment j = 1,} \dots \text{,J}
 $$
@@ -93,13 +96,12 @@ We could have fit random slopes for the three fixed effects. However, the differ
 
 This study will provide insights into the physiological mechanisms underlying the latitudinal distributions of *C. frigida* and *C. pilipes*. We anticipate that:
 
-- *C. frigida* will exhibit lower SCPs, consistent with its adaptation to colder northern climates.
-- *C. pilipes* may demonstrate higher SCPs indicative of lower cold tolerance.
+-   *C. frigida* will exhibit lower SCPs, consistent with its adaptation to colder northern climates.
+-   *C. pilipes* may demonstrate higher SCPs indicative of lower cold tolerance.
 
 ## Significance
 
 Understanding the cold tolerance of these species has implications for predicting their responses to environmental changes, particularly in the context of climate change and its impact on coastal ecosystems.
-
 
 # 2. Power analysis
 
@@ -110,10 +112,9 @@ library(lmerTest)
 library(ggplot2)
 ```
 
-
 ## Simulating the data-generating process
 
-Given this project plan, we will use simulation to determine appropriate sample sizes for detecting the difference in supercooling points between the two seaweed fly species. For this, we need to first write an appropriate generative simulation for the model we plan to fit. 
+Given this project plan, we will use simulation to determine appropriate sample sizes for detecting the difference in supercooling points between the two seaweed fly species. For this, we need to first write an appropriate generative simulation for the model we plan to fit.
 
 Based on the DAG, we need to simulate a set of *Species* and *Experiments* because these have no parents in this DAG (i.e. their values are determined externally to the DAG). To do this, we set the number of seaweed flies of each species that we want to collect. In addition, we set the number of experiments over which these seaweed flies will be collected. To start, we set high replication because we need to make sure that we are correctly simulating our data-generating process.
 
@@ -182,6 +183,7 @@ lm_weight <- lm(W ~ S)
 # print the model summary
 summary(lm_weight)
 ```
+
 Now that we have the *Species*, *Experiment* and *Weight* variables (all the parents of *SCP*), we can simulate the *SCP* values. As mentioned previously, we collected 3 individuals of each species in a pilot and we measured their *SCPs*. Using these data, we calculated the average *SCPs* for both species:
 
 ```{r}
@@ -240,14 +242,11 @@ Using prior information (literature and pilot data), we have placed realistic va
 
 $$
 P_{ij} \sim Normal(\mu_{ij}, \sigma_{residual})
-$$
-$$
+$$ $$
 \mu_{ij} = \alpha_{j} + \beta_1\text{S}_{i} + \beta_2\text{W}_{i} + \beta_3\text{S}_{i}\text{W}_{i}
-$$
-$$
+$$ $$
 \alpha_{j} \sim Normal(\bar{\alpha}, \tau_{\bar{\alpha}}) \text{, for experiment j = 1,} \dots \text{,J}
-$$
-Now, we will simulate the *SCP* values using these data ($P_{ij}$):
+$$ Now, we will simulate the *SCP* values using these data ($P_{ij}$):
 
 ```{r}
 # simulate the alpha_j values
@@ -580,15 +579,3 @@ ggplot(data = power_data |> dplyr::mutate(beta_1_HA = as.character(beta_1_HA)),
 ```
 
 This analysis shows that even with a large effect size of -4.5 (i.e. *SCP* is -4.5 lower in *C. frigida* than in *C. pilipes*), we would need around 50-60 of each species to reliably detect an effect (i.e. power of 80% or more). Moreover, if the effect size is more moderate (e.g. -2.5), we would need more than 120 flies per species to reliably detect such an effect.
-
-
-
-
-
-
-
-
-
-
-
-

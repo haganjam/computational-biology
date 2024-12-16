@@ -79,7 +79,7 @@ Let's test the clean dataset using these rules. First, we need to load the data 
 
 ```{r}
 # load the cleaning function
-source(here::here("04-project-examples/seaweed-flies/code/functions/get_clean_data.R"))
+source(here::here("04-project-examples/seaweed-flies/02-code/functions/get_clean_data.R"))
 ```
 
 Next, we test the data without any outliers being removed and all tests are passed:

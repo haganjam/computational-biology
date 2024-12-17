@@ -1,0 +1,411 @@
+---
+title: "01-report-analysis"
+author: "James G. Hagan"
+format: gfm
+editor: source
+---
+
+## Reporting our analysis
+
+Now we're at the end of the analysis and the last thing we need to do is communicate the results. This is the typical series of graphs/tables etc. that we would put in a paper. I'm sure most of you have had some scientific writing and presentation courses in your time. However, in my view, science has become a victim of the *flashy paper*. The *flashy paper* is the art of presenting a few beautiful graphs and *telling a compelling story*. The quality of the data, sensitivity analyses etc. are less important to the *flashy paper*. Clearly, this has been driven by the big journals like *Nature*, *Science* etc. where the *Methods* sections, arguably the most important part of a paper, barely feature as part of the main text. But, it's also a feature of many smaller journals these days that seem to be obsessed by making sure papers are short by imposing strict word limits. I am in favour of presenting results concisely but not at the expense of presenting important information which I consider to be *anti-science*. Therefore, I am going to suggest a set of practices that I hope you will decide to follow and which are more in-line with the classical principles of science.
+
+At the core of these practices are two simple rules or principles: (1) The readers of your paper should be able to get familiar with the data on which the analysis is based. This means that every variable of interest should be graphed and/or summarised and presented. (2) Any information that is relevant to interpreting the results of the analysis should be easily available (e.g. in the supplementary information or as part of a public repository).
+
+I view this document as a quick way for a reader to get all the relevant information about how the hypothesis was tested without needing to go through the rest of the repository.
+
+### 1. Getting familiar with the data
+
+When is the last time you read a paper that simply presented a table of summary statistics of the data? I bet it was a while ago. And, indeed, the days where journals allow space for readers of a paper to get familiar with the data are long gone. Let's bring those days back.
+
+I am in favour of trying to concisely graph and/or summarise each variable of interest in the dataset that we are analysing. This does not mean that we need pages and pages of histograms but it does mean that we need to think carefully about how we allow our readers to see the data. So, let's think about this for our analysis.
+
+```{r}
+# load the data cleaning script
+source(here::here("04-project-examples/seaweed-flies/02-code/functions/get_clean_data.R"))
+
+# load the cleaned dataset with all data points
+clean_data <- get_clean_data(handle_outliers = NA)
+head(clean_data)
+
+# convert species_abb to a factor and re-level
+clean_data$species_abb <- factor(clean_data$species_abb, levels = c("P", "F"))
+```
+
+Based on our Directed Acyclic Graph that we produced for this analysis, we know that we have three main variables of interest: *species*, *weight (mg)* and *supercooling point (degrees C)* along with the *experiment number*.
+
+```{r}
+library(ggdag)
+
+dag1 <- 
+  dagify(
+  SCP ~ E + S + W,
+  W ~ S,
+  coords = list(
+    x = c(E = 0.535, SCP = 0.535, S = 0.45, W = 0.368),
+    y = c(E = 0.230, SCP = 0.345, S = 0.230, W = 0.345)
+  ),
+  exposure = c("E", "S"),
+  outcome = "SCP"
+)
+
+# Plot the DAG
+ggdag(dag1) +
+  theme_dag()
+
+```
+
+In this case, I think it makes sense to make three graphs: (1) A graph comparing weight among species, (2) A graph comparing supercooling point among species and (3) A graph showing the correlation between weight and supercooling point within and between species. I would present these graphs in the main text of the paper. In addition, I would probably add a few graphs showing the variation in these three variables with experiment in the supplementary material.
+
+```{r}
+# load relevant plotting library
+library(ggplot2)
+
+# load custom plotting theme
+source(here::here("04-project-examples/seaweed-flies/03-report/plot-theme.R"))
+```
+
+**Graph 1**
+
+```{r}
+# compare weight among species
+
+# calculate the summary statistics
+w_sum <-
+  clean_data |>
+  dplyr::group_by(species_name) |>
+  dplyr::summarise(weight_mg_m = mean(weight_mg),
+                   weight_mg_sd = sd(weight_mg))
+
+# extract the outlier rows
+outlier_rows <- c("19", "34", "35")
+w_outliers <-
+  clean_data |>
+  dplyr::filter(row_id %in% outlier_rows)
+
+# remove the outlier rows
+w_raw <-
+  clean_data |>
+  dplyr::filter(!(row_id %in% outlier_rows))
+
+# plot the raw data with the mean and standard deviation
+p1 <-
+  ggplot() +
+  ggbeeswarm::geom_quasirandom(data = w_raw,
+                               mapping = aes(x = species_name, y = weight_mg),
+                               width = 0.05, shape = 1, alpha = 0.5, size = 2) +
+  geom_point(data = w_sum,
+             mapping = aes(x = species_name, y = weight_mg_m), 
+             colour = "red", shape = 18, size = 4) +
+  geom_errorbar(data = w_sum,
+                mapping = aes(x = species_name, 
+                              ymin = weight_mg_m - weight_mg_sd,
+                              ymax = weight_mg_m + weight_mg_sd), 
+                colour = "red", width = 0) +
+  geom_point(data = w_outliers,
+             mapping = aes(x = species_name, y = weight_mg),
+             shape = 4, colour = "black", size = 2) +
+  xlab(NULL) +
+  ylab("Weight (mg)") +
+  theme_meta()
+
+p1
+
+```
+
+**Graph 2**
+
+```{r}
+# compare supercooling point among species
+
+# calculate the summary statistics
+scp_sum <-
+  clean_data |>
+  dplyr::group_by(species_name) |>
+  dplyr::summarise(scp_c_m = mean(scp_c),
+                   scp_c_sd = sd(scp_c))
+
+# extract the outlier rows
+outlier_rows <- c("17", "31")
+scp_outliers <-
+  clean_data |>
+  dplyr::filter(row_id %in% outlier_rows)
+
+# remove the outlier rows
+scp_raw <-
+  clean_data |>
+  dplyr::filter(!(row_id %in% outlier_rows))
+
+# plot the raw data with the mean and standard deviation
+p2 <-
+  ggplot() +
+  ggbeeswarm::geom_quasirandom(data = scp_raw,
+                               mapping = aes(x = species_name, y = scp_c),
+                               width = 0.05, shape = 1, alpha = 0.5, size = 2) +
+  geom_point(data = scp_sum,
+             mapping = aes(x = species_name, y = scp_c_m), 
+             colour = "red", shape = 18, size = 4) +
+  geom_errorbar(data = scp_sum,
+                mapping = aes(x = species_name, 
+                              ymin = scp_c_m - scp_c_sd,
+                              ymax = scp_c_m + scp_c_sd), 
+                colour = "red", width = 0) +
+  geom_point(data = scp_outliers,
+             mapping = aes(x = species_name, y = scp_c),
+             shape = 4, colour = "black", size = 2) +
+  xlab(NULL) +
+  ylab("Supercooling point (C)") +
+  theme_meta()
+
+p2
+
+```
+
+
+```{r}
+# combine these three plots
+cowplot::plot_grid(p1, p2, nrow = 1, ncol = 2)
+```
+
+**Graph 3**
+
+```{r}
+# correlation between weight and supercooling point within and among species
+
+# extract the outliers
+outlier_rows <- c("19", "34", "35", "17", "31")
+cor_outliers <-
+  clean_data |>
+  dplyr::filter(row_id %in% outlier_rows)
+
+# remove the outlier rows
+cor_raw <-
+  clean_data |>
+  dplyr::filter(!(row_id %in% outlier_rows))
+
+# plot the relationship between scp and weight_mg
+p3 <-
+  ggplot() +
+  geom_point(data = cor_raw,
+             mapping = aes(x = weight_mg, y = scp_c, colour = species_name),
+             shape = 1, alpha = 1, size = 2) +
+  geom_point(data = cor_outliers,
+             mapping = aes(x = weight_mg, y = scp_c, colour = species_name),
+             shape = 4, size = 2, show.legend = FALSE) +
+  ylab("Supercooling point (C)") +
+  xlab("Weight (mg)") +
+  theme_meta() +
+  theme(legend.title = element_blank())
+
+p3
+
+```
+
+With these three graphs, any reader can, in my view, get familiar with the data and get answers to questions like: How variable is the data? What do the outliers look like? etc. In addition, I would probably pair these three graphs with a summary table presenting some key summary statistics so that it is easy for a reader to get an idea of the actual numbers.
+
+**Summary table**
+
+```{r}
+# calculate some key summary statistics
+
+# weight
+w_sum <-
+  clean_data |>
+  dplyr::group_by(species_name) |>
+  dplyr::summarise(n = dplyr::n(),
+                   mean = round(mean(weight_mg), 1),
+                   sd = round(sd(weight_mg), 1),
+                   min = round(min(weight_mg), 1),
+                   max = round(max(weight_mg), 1))
+
+# scp
+scp_sum <-
+  clean_data |>
+  dplyr::group_by(species_name) |>
+  dplyr::summarise(n = dplyr::n(),
+                   mean = round(mean(scp_c), 1),
+                   sd = round(sd(scp_c), 1),
+                   min = round(min(scp_c), 1),
+                   max = round(max(scp_c), 1))
+
+# bind the rows
+sum_table <- dplyr::bind_rows(w_sum, scp_sum)
+
+# add identifiers for weight and scp
+sum_table <- dplyr::bind_cols(dplyr::tibble(variable = c("Weight (mg)", "", "SCP (C)", "")), sum_table)
+
+# rename the species_name column
+sum_table <- dplyr::rename(sum_table, species = species_name)
+
+# print the table
+sum_table
+```
+
+
+### 2. Presenting the analysis
+
+As I mentioned previously, I strongly believe that any information relevant to properly interpreting the results of the analysis should be easily available. We will run the analysis and then provide all the information that is needed to interpret the results. Of course, not all of this needs to go into the final paper but it should be available in a public repository like this, for example.
+
+We tested our hypothesis that *C. frigida* exhibits a higher tolerance to cold compared to *C. pilipes* because *C. frigida* it tends to occur at higher latitudes than *C. pilipes* and should therefore be more cold-adapted. Based on the model we fit, the critical test of the hypothesis is whether the *species_abbF* in the model is significantly different from zero as this indicates that the species differ in the *SCP*. We will fit the simple linear model as we were unable to estimate variation between experiments using the linear mixed-effect models.
+
+```{r}
+# fit the model
+lm1 <- lm(scp_c ~ species_abb + weight_mg + species_abb:weight_mg, data = clean_data)
+```
+
+When I say "any information relevant to properly interpreting the results of the analysis", I'm basically talking about proper model reporting (i.e. all relevant model information) and about tests of model assumptions. All models carry assumptions and if those assumptions are not met, then our inferences will be biased.
+
+**Model assumptions**
+
+The equation for this model can be written as follows and shows the assumptions that the model makes (P - supercooling point), S (species: 0 - *C. pilipes*, 1 - *C. frigida*) and W (weight):
+
+$$
+ P_{i} \sim Normal(\mu_{i}, \sigma_{residual}) \\
+ \mu_{i} = \alpha + \beta_1\text{S}_{i} + \beta_2\text{W}_{i} + \beta_3\text{S}_{i}\text{W}_{i}
+$$
+What we can take from this equation is that (1) the distribution of the supercooling point data around $\mu_i$ should be normal and (2) the variation of the supercooling point data around $\mu_i$ should be constant (i.e. there is only one value for $\sigma_{residual}$).
+
+*Assumption 1*
+
+We test the first assumption by checking if the residuals of the model are normally distributed. There are various ways to do this. Most papers write something like: "We tested the model assumptions by graphically inspecting the residuals". I really can't stand it when I read that because there is absolutely no way for us to verify whether you did this properly or not. I think this kind of graphical analysis is very good but I doubt that many people take it seriously. We will do better by showing all the ways we did such a graphical inspection.
+
+First, we will simply make a histogram of the residuals and see if it looks vaguely normal. To me, it does not look perfect but, it's not that bad.
+
+```{r}
+# make a residual histogram plot
+ggplot() +
+  geom_histogram(mapping = aes(x = residuals(lm1))) +
+  theme_meta()
+```
+
+Next, we can calculate the mean and standard deviation of the residuals and then draw samples from a normal distribution with those parameters. We can then compare these simulated values to the observed data to see if they look similar. We can run this code block multiple times to compare the observed (dark grey) to the simulated data (red). If they look similar, then we could argue that the residuals are adequately normally distributed:
+
+```{r}
+# get the mean and standard deviation of the residuals
+mean_residual <- mean(residuals(lm1))
+sd_residual <- sd(residuals(lm1))
+
+# how many data points to simulate
+n_residual <- length(residuals(lm1))
+
+# plot the observed data
+ggplot() +
+  geom_histogram(mapping = aes(x = residuals(lm1)), colour = "black", alpha = 0.2) +
+  geom_histogram(mapping = aes(x = rnorm(n = n_residual, mean = mean_residual, sd = sd_residual)),
+                 fill = "red", colour = "red", alpha = 0.2) +
+  theme_meta()
+```
+Another popular graphical representation of the normal distribution is a *qqplot* which plots the theoretical quantiles under the normal distribution against the observed quantiles in the data. This plot shows that some of the points deviate from the normal distribution at the higher and lower quantiles.
+
+```{r}
+# make a qqplot
+ggplot(data = dplyr::tibble(residuals = residuals(lm1)), 
+       mapping = aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line() +
+  labs(
+    x = "Theoretical Quantiles",
+    y = "Sample Quantiles"
+  ) +
+  theme_meta()
+```
+Overall, I would argue that the residuals are sufficiently normally distributed to not bias our inference. In general, regression is relatively robust to this assumption. However, others may disagree with this graphical analysis and, therefore, have less confidence in our results. That is why I think that presenting this information is important.
+
+*Assumption 2*
+
+The second and probably more important assumption is the homoscedascicity assumption (i.e. variance around the mean stays constant). The typical way for this assumption to be tested is using a residuals by fitted values plot. There should be no pattern in this plot. This plot clearly shows that there is no pattern in the residuals with the fitted values. Therefore, I would argue that this assumption is valid.
+
+```{r}
+# residuals vs fitted values plot
+ggplot(mapping = aes(x = fitted(lm1), y = residuals(lm1))) +
+  geom_point(color = "blue", size = 2) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +  # Horizontal line at y = 0
+  geom_smooth(method = "lm") +
+  labs(
+    x = "Fitted Values",
+    y = "Residuals"
+  ) +
+  theme_meta()
+```
+
+**Model reporting**
+
+So now we have tested the assumptions and, in my opinion, the assumptions are valid, we can provide the relevant model statistics and interpret the model to see whether our hypothesis was supported or not. So, let's create the model summary output and interpret the results.
+
+```{r}
+# extract model summary into tidy format
+tidy_summary <- broom::tidy(lm1)
+glance_summary <- broom::glance(lm1)
+
+# Combine relevant results into a nice table
+model_table <- 
+  tidy_summary |>
+  select(term, estimate, std.error, statistic, p.value) |>
+  mutate(
+    p.value = format.pval(p.value, digits = 3, eps = 0.001)  # Format p-values
+  )
+
+model_table
+
+# Print model metrics like R-squared and Adjusted R-squared
+model_metrics <- data.frame(
+  Metric = c("R-squared", "Adjusted R-squared", "Residual Std. Error", "Degrees of Freedom"),
+  Value = c(
+    round(glance_summary$r.squared, 3),
+    round(glance_summary$adj.r.squared, 3),
+    round(glance_summary$sigma, 3),
+    glance_summary$df.residual
+  )
+)
+
+model_metrics
+
+```
+
+Examining these tables, we see is that the estimate of the *species_abbF* is -1.8. This means that, on average, *C. frigida* has an *SCP* of 1.8 degrees C lower than *C. pilipes*. However, given the variability in the estimate and the degrees of freedom, the probability of observing a more extreme estimate under the null hypothesis that the effect is zero is 0.33 (P = 0.332) which is weak evidence. However, given that we know that the power of this test is very low, this experiment does not constitute strong evidence in favour of the null hypothesis or the alternative hypothesis. In addition, the r-squared value is 0.077 which is very low and indicates that the model does not fit the observed data very well.
+
+Finally, we can plot the model results on a graph with the observed data to visualise the results. For this, we will simulate the model estimate and 95% confidence for the difference in *SCP* between *C. frigida* and *C. pilipes* given three different weight values corresponding to the 10%, 50% and 90% quantiles.
+
+```{r}
+# get the 10%, 50% and 90% quantiles for weight
+weight_quant <- quantile(x = clean_data$weight_mg, c(0.10, 0.50, 0.90))
+names(weight_quant) <- NULL
+
+# create a dataset with the values we want from the model
+data_simulate <- dplyr::tibble(weight_mg = rep(weight_quant, each = 2),
+                               species_abb = factor(rep(c("P", "F"), 3), levels = c("P", "F")))
+
+# simulate the model mean and 95% confidence interval
+pred <- predict(lm1, data_simulate, interval = "confidence")
+
+# bind this to the simulated data
+data_simulate <- dplyr::bind_cols(data_simulate, pred)
+
+# add a quantile variable
+data_simulate$quantile <- rep(c("10%", "50%", "90%"), each = 2)
+
+```
+
+Using these simulated data from the model, we can plot these predictions on top of the observed data. Note that the model makes predictions for three different weight values but we overlay all observed data on all three plots.
+
+```{r}
+# plot the predictions on the observed data
+ggplot() +
+  ggbeeswarm::geom_quasirandom(data = clean_data,
+                               mapping = aes(x = species_abb, y = scp_c, colour = weight_mg),
+                               width = 0.05, shape = 1) +
+  geom_point(data = data_simulate,
+             mapping = aes(x = species_abb, y = fit)) +
+  geom_errorbar(data = data_simulate,
+             mapping = aes(x = species_abb, ymin = lwr, ymax = upr), width = 0) +
+  geom_line(data = data_simulate,
+            mapping = aes(x = as.numeric(species_abb), y = fit)) +
+  facet_wrap(~quantile) +
+  xlab(NULL) +
+  ylab("Supercooling point (C)") +
+  theme_meta()
+```
+
+
+
+
+

@@ -111,11 +111,11 @@ we will fit the following model where the variables are abbreviated as:
 (*SCP* - *P*, *Species* - *S*, *Weight* - *W*, *Experiment* - *E*).
 
 $$
-P_{ij} \sim Normal(\mu_{ij}, \sigma_{residual})
-$$ $$
-\mu_{ij} = \alpha_{j} + \beta_1\text{S}_{i} + \beta_2\text{W}_{i} + \beta_3\text{S}_{i}\text{W}_{i}
-$$ $$
-\alpha_{j} \sim Normal(\bar{\alpha}, \tau_{\bar{\alpha}}) \text{, for experiment j = 1,} \dots \text{,J}
+\begin{aligned}
+ P_{ij} \sim Normal(\mu_{ij}, \sigma_{residual}) \\
+ \mu_{ij} = \alpha_{j} + \beta_1\text{S}_{i} + \beta_2\text{W}_{i} + \beta_3\text{S}_{i}\text{W}_{i} \\
+ \alpha_{j} \sim Normal(\bar{\alpha}, \tau_{\bar{\alpha}}) \text{, for experiment j = 1,} \dots \text{,J} \\
+\end{aligned}
 $$
 
 This model fits a random intercept for the *Experiment* along with fixed

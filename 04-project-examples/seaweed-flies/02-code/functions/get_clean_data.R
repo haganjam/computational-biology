@@ -61,7 +61,7 @@ get_clean_data <- function(handle_outliers = NA) {
     )
   
   # Define outliers
-  w_outliers <- c("19", "34", "25")
+  w_outliers <- c("19", "34", "35")
   scp_outliers <- c("17", "31")
   all_outliers <- unique(c(w_outliers, scp_outliers))
   

@@ -405,7 +405,9 @@ ggplot() +
   theme_meta()
 ```
 
+### Summary
 
+In my view, this kind of project structure is essential for improving the way we do science. This project is well-documented and reproducible and allows readers to easily get a sense of the analysis and the data. I would encourage all of you to try and do your projects in this way.
 
 
 

@@ -55,7 +55,7 @@ raw_data |>
 
 ## Variable names
 
-In my view, variable names should follow standard convetions for machine readability. This means that there should not be any spaces, special characters or capital letters. There is a convenience function to do just this from the *janitor* R-package but I prefer to simply do it manually. Let's rename these variables.
+In my view, variable names should follow standard conventions for machine readability. This means that there should not be any spaces, special characters or capital letters. There is a convenience function to do just this from the *janitor* R-package but I prefer to simply do it manually. Let's rename these variables.
 
 ```{r}
 # rename the variables

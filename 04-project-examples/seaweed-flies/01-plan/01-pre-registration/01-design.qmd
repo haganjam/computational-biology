@@ -140,10 +140,7 @@ Now that we have these parents, we can simulate the descendants as functions of 
 We use the following equation to simulate *Weight* as a function of *Species* and we substitute these prior parameter measurements where $W_{i}$ is the *Weight* variable, $\sigma_{weight}$ is 1.5, $\theta$ is the average weight of *C. pilipes* (8.5 mg), $\beta_\text{species}$ is the difference between *C. pilipes* and *C. frigida* which is around -3.5 mg and $S_{i}$ is the *Species* variable (0 - *C. pilipes*, 1 - *C. frigida*).
 
 $$
-W_{i} \sim Normal(\gamma_{i}, \sigma_{weight})
-$$
-
-$$
+W_{i} \sim Normal(\gamma_{i}, \sigma_{weight}) \\
 \gamma_{i} = \theta + \beta_\text{species}\text{S}_{i}
 $$
 
@@ -235,12 +232,11 @@ sigma_residual <- 1
 Using prior information (literature and pilot data), we have placed realistic values on all the relevant parameter values and variables to allow us to simulate *SCP* based on the following equation (pasted again from above):
 
 $$
-P_{ij} \sim Normal(\mu_{ij}, \sigma_{residual})
-$$ $$
-\mu_{ij} = \alpha_{j} + \beta_1\text{S}_{i} + \beta_2\text{W}_{i} + \beta_3\text{S}_{i}\text{W}_{i}
-$$ $$
+P_{ij} \sim Normal(\mu_{ij}, \sigma_{residual}) \\
+\mu_{ij} = \alpha_{j} + \beta_1\text{S}_{i} + \beta_2\text{W}_{i} + \beta_3\text{S}_{i}\text{W}_{i} \\
 \alpha_{j} \sim Normal(\bar{\alpha}, \tau_{\bar{\alpha}}) \text{, for experiment j = 1,} \dots \text{,J}
-$$ Now, we will simulate the *SCP* values using these data ($P_{ij}$):
+$$
+Now, we will simulate the *SCP* values using these data ($P_{ij}$):
 
 ```{r}
 # simulate the alpha_j values

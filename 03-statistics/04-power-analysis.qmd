@@ -1,0 +1,328 @@
+---
+title: "Power, power and more power"
+format: html
+editor: visual
+---
+
+
+
+When I was still in my *corporate James* phase as many of you were referring to me, I applied for statistical modelling position at one of the BEL20 bio-technology companies: **argenx**. The first step after the initial screening was a task based around the Game of the Goose or, in Dutch, [*Ganzenbord*](https://nl.wikipedia.org/wiki/Ganzenbord).
+
+*Ganzenbord* is effectively a race determined by dice roles where players move their player forward by the number of places according to the number of rolls. Traditionally, the game ends when one player reaches *exactly* 63. However, in this version, a player wins when they cross 63 and wins by the amount that they overshoot 63 by (e.g. if both players are on 61 and **player A** rolls a five whilst **player B** rolls a one, **player A** would win by four points):
+
+::: {#fig-ganzenbord}
+
+![](figures-tables/ganzenbord.JPG)
+
+Example of a traditional *Ganzenbord* board.
+
+:::
+
+In this context, there were several questions that we had to answer. For example:
+
+**Q1.** In case of a player's win: how big can the difference between player A and player B be to conclude that both dice are probably not different (and both regular)? How can you visualize this appropriately?
+
+*For Q1, this was my answer:*
+
+To answer this question, I performed a simulation experiment. Specifically, I simulated 100 000 individual games of Ganzenbord using two hypothetical fair, six-sided die and, at the end of each game (i.e. when either player A or B had reached or exceeded field 63), I calculated the difference in score between the players (player A's score - player B's score). In all 100 000 games, the players had the same number of turns (although between games, the number of turns varied as per the rules of the game). Using the 100 000 differences in scores between the players obtained from the simulations, I obtained a distribution of these differences (@fig-ganzenbord-q1). Then, I calculated the 2.5% and 97.5% quantiles which were -19 and 19 respectively (vertical dashed lines in Fig. 1). Therefore, if the difference in score between player A and player B is less than 19, it would be reasonable to conclude the dice are probably not different and both regular because in approximately 95% of the simulated games between two, fair, six-sided dice, the score difference would be 19 or less. However, if the difference was more than 19, this would only happen approximately 5% of the time in a game played with two fair, six-sided dice and, would therefore, suggest the two dice might be different.
+
+```{r}
+#| label: fig-ganzenbord-q1
+#| fig-cap: "The distribution of the difference in scores between Player A and Player B using a fair die in 100 000 simulated games of Ganzenbord. Grey regions represent the regions of the distribution that are greater than 19 or less than -19 (the 2.5% and 97.5% quantiles respectively)."
+
+# load the plotting theme
+source(here::here("functions/plot-theme-func.R"))
+
+# set the seed
+set.seed(12345)
+
+# how many games to simulate
+n <- 100000
+
+# get a six-sided die
+die <- seq_len(6)
+
+# run n experiments
+sc_vec <- vector(length = n)
+for (i in seq_len(n)) {
+  
+  # both players start at position 0
+  p1 <- 0
+  p2 <- 0
+  
+  # do this while neither p1 nor p2 are greater than or equal to 63
+  while((p1 < 63 & p2 < 63)) {
+    
+    # play the game
+    p1 <- p1 + sample(die, 1, replace = TRUE)
+    p2 <- p2 + sample(die, 1, replace = TRUE)
+    
+  }
+  
+  # calculate the difference
+  sc <- (p1 - p2)
+  
+  # add this to a list
+  sc_vec[i] <- sc
+  
+}
+
+# push into a data.frame
+dat <- dplyr::tibble(score_difference = as.numeric(sc_vec))
+
+# trim to the 95% quantiles
+q_low <- quantile(sc_vec, 0.025)
+q_high <- quantile(sc_vec, 0.975)
+
+# plot the base plot
+p1 <- 
+  ggplot(mapping = aes(x = score_difference)) +
+  geom_density(data = dat, bw = 1.2, fill = "#85D4E3", alpha = 0.75)
+
+# modify to illustrate the various critical regions
+
+# extract density-plot data
+p1_dat <- ggplot_build(p1)
+p1_dat <- dplyr::as_tibble(p1_dat$data[[1]][, c("x", "y")])
+
+# get the y_range
+max_y_offset <- 0.01
+max_y <- max((p1_dat$y + max_y_offset))
+
+# get the vline segment data
+vline <- dplyr::tibble(min_y = 0, max_y = (max_y - max_y_offset) + 0.005,
+                       min_x = c(q_low, q_high) , max_x = c(q_low, q_high))
+
+# set the vline label
+vline_lab_low <- expression(Q["2.5%"])
+vline_lab_high <- expression(Q["97.5%"])
+
+# update the null graph
+p1 <- 
+  p1 +
+  geom_area(data = dplyr::filter(p1_dat, x > q_high),
+            aes(x = x, y = y), fill = "grey", alpha = 0.75,
+            linewidth = 0.5, colour = "black") +
+  geom_area(data = dplyr::filter(p1_dat, x < q_low),
+            aes(x = x, y = y), fill = "grey", alpha = 0.75,
+            linewidth = 0.5, colour = "black") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, max_y)) +
+  scale_x_continuous(oob = scales::oob_keep) +
+  geom_segment(data = vline,
+               mapping = aes(x = min_x, xend = max_x, y = min_y, yend = max_y),
+               linetype = "dashed") +
+  annotate("text", x = vline$min_x[1], y = vline$max_y + 0.001, label = vline_lab_low) +
+  annotate("text", x = vline$min_x[2], y = vline$max_y + 0.001, label = vline_lab_high) +
+  xlab("(Player B - Player A)") +
+  ylab("Density") +
+  ggtitle("") +
+  theme_meta() +
+  theme(plot.title = element_text(colour = "white"))
+
+# plot
+suppressWarnings(plot(p1))
+```
+
+This is a classic kind of analysis kind of null hypothesis logic that many of us are familiar with. However, the questions also got more interesting.
+
+**Q2.** Suppose die A is actually 5-sided with values 1 to 5 (uniform probability), how large is the statistical power that player B wins 'significantly' with a regular die?
+
+To answer this question, I first simulated 100 000 individual games using two hypothetical fair, six-sided dice and, at the end of each game (i.e. when either Player A or B had reached or exceed field 63), I calculated the difference in score between the players (Player B's score - Player A's score). The distribution of the score differences in the 100 000 simulated games between Player B and Player B using fair six-sided dice is an approximation of the null distribution (i.e. what we would expect to see in a large number of games with two, fair, six-sided dice) (@fig-ganzenbord-q2 a). The alternative hypothesis is that the die that Player A uses (i.e. die A) is actually a fair, five-sided die. To define this alternative hypothesis, I simulated 100 000 individual games where Player B used a fair, six-sided die and Player A used a fair, five-sided dice. At the end of each game, I calculated the score difference between Player B and Player B and plotted the distribution (@fig-ganzenbord-q2 b).
+
+I defined player B *winning 'significantly'* (as per the question) using the null distribution (@fig-ganzenbord-q2 a). Specifically, based on the null distribution, there is approximately a 5% chance of observing a score difference (Player B - Player A) between games with fair, six-sided dice of greater than 16 (shaded grey area, @fig-ganzenbord-q2 a). Therefore, with an alpha-level of 0.05 (as is typical), a score difference of greater than 16 would constitute Player B *winning 'significantly'* in my interpretation.
+
+In this context, power is defined as the chance of observing a difference of greater than 16 if the data are drawn from the distribution associated with the alternative hypothesis (@fig-ganzenbord-q2 b). Given our simulated alternative distribution, the chance that Player B wins with a score difference of more than 16 points is approximately 21% (i.e. in 21% of the 100 000 simulation games, we obtained a score difference of greater than 16). Therefore, the statistical power that Player B wins *'significantly'* with a fair, six-sided die against a fair, five-sided die is around 21% (yellow region, @fig-ganzenbord-q2 b).
+
+```{r}
+# set the seed
+set.seed(549825)
+
+# how many games to simulate
+n <- 100000
+
+# set-up a six-sided die and a five-sided die
+die6 <- seq_len(6)
+die5 <- seq_len(5)
+
+# simulate the null distribution
+sc_null <- vector(length = n)
+for (i in seq_len(n)) {
+  
+  # both players start at position 0
+  pB <- 0
+  pA <- 0
+  
+  # do this while neither p1 nor p2 are greater than or equal to 63
+  while((pB < 63 & pA < 63)) {
+    
+    # play the game
+    pB <- pB + sample(die6, 1, replace = TRUE)
+    pA <- pA + sample(die6, 1, replace = TRUE)
+    
+  }
+  
+  # calculate the difference
+  sc <- (pB - pA)
+  
+  # add this to a list
+  sc_null[i] <- sc
+  
+}
+
+# simulate the alternative distribution
+sc_alt <- vector(length = n)
+for (i in seq_len(n)) {
+  
+  # both players start at position 0
+  pB <- 0
+  pA <- 0
+  
+  # do this while neither p1 nor p2 are greater than or equal to 63
+  while((pB < 63 & pA < 63)) {
+    
+    # play the game
+    pB <- pB + sample(die6, 1, replace = TRUE)
+    pA <- pA + sample(die5, 1, replace = TRUE)
+    
+  }
+  
+  # calculate the difference
+  sc <- (pB - pA)
+  
+  # add this to a list
+  sc_alt[i] <- sc
+  
+}
+
+# estimate the 95% quantile
+q_high <- quantile(sc_null, 0.95)
+
+# what percentage of cases are greater than 19?
+power <- sum(sc_alt > q_high)/length(sc_alt)
+
+# print the result
+print(paste0("Power: ", round(power, 2)))
+```
+
+```{r}
+#| label: fig-ganzenbord-q2
+#| fig-cap: "The distribution of the difference in scores between Player B and Player A in a 100 000 games of Ganzenbord under (a) the null hypothesis where both Player B and Player A use fair, six-sided dice and (b) the alternative hypothesis where Player B uses a fair, six sided die and Player A uses a fair, five-sided die. In (a), the null hypothesis, the grey shaded region indicates the probability of observing a score difference of more than 16 (i.e. a significant score difference at the 5%-level). The grey shaded region in (b) is the same region under the alternative hypothesis. In (b), the yellow region represents the statistical power of observing a score difference of more than 16 under the alternative hypothesis."
+
+# pull into data.frames
+
+# null
+df_null <- dplyr::tibble(score_difference = as.numeric(sc_null))
+
+# alternative
+df_alt <- dplyr::tibble(score_difference = as.numeric(sc_alt))
+
+# get the q_null
+q_null <- quantile(df_null$score_difference, 0.95)
+
+# plot the basic plots
+
+# plot the null distribution
+p1 <- 
+  ggplot(mapping = aes(x = score_difference)) +
+  geom_density(data = df_null, bw = 0.75, fill = "#85D4E3", alpha = 0.75)
+
+# plot the alternative distribution
+p2 <- 
+  ggplot(mapping = aes(x = score_difference)) +
+  geom_density(data = df_alt, bw = 0.75, fill = "grey", alpha = 0.75)
+
+# modify to illustrate the various critical regions
+
+# extract density-plot data
+p1_dat <- ggplot_build(p1)
+p1_dat <- dplyr::as_tibble(p1_dat$data[[1]][, c("x", "y")])
+
+# extract density-plot data
+p2_dat <- ggplot_build(p2)
+p2_dat <- dplyr::as_tibble(p2_dat$data[[1]][, c("x", "y")])
+
+# get the x_range
+range_x <- range(c(df_null$score_difference, df_alt$score_difference)) + c(-1, 1)
+
+# get the y_range
+max_y_offset <- 0.02
+max_y <- max(c(p1_dat$y, p2_dat$y)) + max_y_offset
+
+# get the vline segment data
+vline <- dplyr::tibble(min_y = 0, max_y = (max_y - max_y_offset) + 0.005,
+                       min_x = q_null, max_x = q_null)
+
+# set the vline label
+vline_lab <- expression(H[0]~"crit."[95]~"%")
+
+# update the null graph
+p1 <- 
+  p1 +
+  geom_area(data = dplyr::filter(p1_dat, x > q_null),
+            aes(x = x, y = y), fill = "grey", alpha = 0.75,
+            linewidth = 0.5, colour = "black") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, max_y)) +
+  scale_x_continuous(limits = range_x, oob = scales::oob_keep) +
+  geom_segment(data = vline,
+               mapping = aes(x = min_x, xend = max_x, y = min_y, yend = max_y),
+               linetype = "dashed") +
+  annotate("text", x = vline$min_x, y = vline$max_y + 0.005, label = vline_lab) +
+  xlab("(Player B - Player A)") +
+  ylab("Density") +
+  theme_meta()
+
+# update the alternative graph
+p2 <- 
+  p2 +
+  geom_area(data = dplyr::filter(p2_dat, x > q_null),
+            aes(x = x, y = y), fill = "#FAD77B", alpha = 0.75,
+            linewidth = 0.5, colour = "black") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, max_y)) +
+  scale_x_continuous(limits = range_x, oob = scales::oob_keep) +
+  xlab("(Player B - Player A)") +
+  ylab("Density") +
+  geom_segment(data = vline,
+               mapping = aes(x = min_x, xend = max_x, y = min_y, yend = max_y),
+               linetype = "dashed") +
+  annotate("text", x = vline$min_x, y = vline$max_y + 0.005, label = vline_lab) +
+  theme_meta() +
+  theme(axis.line.y = element_line(colour = "white"),
+        axis.text.y = element_text(colour = "white"),
+        axis.title.y = element_text(colour = "white"),
+        axis.ticks.y = element_line(colour = "white"))
+
+# plot the graphs side by side
+p12 <- suppressWarnings(cowplot::plot_grid(p1, p2, labels = c("a", "b"), label_size = 11))
+
+# plot the graph
+plot(p12)
+
+```
+
+To me, these kinds of issues, which were illustrated to me by this task get to the core of the role of statistics in science. 
+
+1. How do we know when two experimental treatments are different or the same?
+2. How big are differences between treatments likely to be and can our experimental set-up detect such differences?
+3. If we do not see a differences between groups, does this mean that there is no difference or does it mean that our experiment was unlikely to detect it?
+
+In the pharmaceutical and bio-technology industries, people think about these questions a lot. However, based on my experience, biologists and ecologists pay almost no attention to these kinds of questions.
+
+For me, there are two important consequences of ignoring these questions:
+
+1. Doing experiments that are unable to detect even small differences among treatments. If, based on literature or pilot experiments, we can estimate the chance of detecting an effect and the chance is very low (e.g. 10%), it is probably not worth doing the experiment.
+
+2. Interpreting null results. If our experiment is unlikely to detect a given effect and we do not detect that effect, what does it mean? Is there no effect or is our experiment bad?
+
+Disease testing analogies... Maybe this is something to look into as well... How are we going to structure this thing...
+
+
+
+
+
+
+
+
+
+
+
+

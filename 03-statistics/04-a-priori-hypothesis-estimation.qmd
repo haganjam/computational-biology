@@ -1,0 +1,51 @@
+---
+title: "04-a-priori-hypothesis-estimation"
+format: html
+editor: source
+---
+
+Wacholder et al. (2013) apply the ideas of statistical power and a-priori hypothesis correctness to the *false positive probability report*.
+
+I think this needs to be thought about in ecology as well. Here is an example paper to go through.
+
+## Critical Summary: Chen et al. (2024) – *Journal of Ecology*
+
+**Citation**:  
+Chen, L., Luo, Y., et al. (2024). *Change in functional trait diversity mediates the effects of nutrient addition on grassland stability*. Journal of Ecology, 112(5), 2598–2612.
+
+### Summary
+
+Chen et al. use data from the Nutrient Network to test how community-weighted means (CWMs) and functional diversity (FD) of plant traits mediate the effect of nutrient addition on five dimensions of grassland stability. The study employs linear mixed models and structural equation models (SEMs) to assess these links across six trait dimensions.
+
+### Strengths
+
+- High-quality, long-term ecological dataset from a globally coordinated network (NutNet).
+- Addresses important questions about the role of functional traits in ecosystem stability.
+- Uses multiple dimensions of stability (invariability, resistance, recovery under drought/wet) rather than a single metric.
+
+### Key Concerns
+
+#### 1. **Multiple Testing Without Correction**
+The paper fits separate SEMs for each trait (6 total), each containing ~25 pathways. This results in over 150 statistical tests, yet no correction for multiple comparisons is applied. Paths are judged significant at p ≤ 0.05 or even p ≤ 0.10 (“marginally significant”) thresholds.
+
+#### 2. **High False-Positive Risk**
+Using the false-positive report probability (FPRP) framework from Wacholder et al. (2004), we estimate that:
+- If only 5% of paths reflect true effects (π = 0.05) and power = 0.80,
+- Then over **50% of the reported “significant” effects are likely false positives**.
+
+#### 3. **Lack of Model Regularisation**
+All traits are modelled separately. This increases the chance of spurious correlations due to trait collinearity and noise. No hierarchical or Bayesian regularisation is used to shrink unlikely effects toward zero.
+
+#### 4. **Selective Reporting**
+Only significant or marginally significant trait–stability links are highlighted in the results and discussion, without acknowledging the broader testing landscape or the number of relationships that failed to replicate across traits.
+
+### Recommendations
+
+- Apply False Discovery Rate (FDR) corrections or use FPRP thresholds to evaluate significance more conservatively.
+- Consider fitting a multivariate or hierarchical SEM where multiple trait effects are estimated jointly.
+- Pre-specify a smaller, mechanistically motivated set of trait hypotheses.
+- Emphasise replication of key results across sites or years.
+
+### Conclusion
+
+While Chen et al. tackle an important ecological question with a rich dataset, the absence of multiple-testing control and the large number of loosely constrained statistical tests cast doubt on the robustness of many of their reported relationships. The paper is a useful case study in how well-intentioned trait-based ecology can drift into the “many tests, few truths” regime—and would benefit from applying the FPRP lens to sort likely signals from noise.

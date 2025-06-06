@@ -1,0 +1,335 @@
+---
+title: "Why statistical power matter for ecological research"
+format: html
+editor: source
+---
+
+```{r}
+# load relevant libraries and functions
+library(ggplot2)
+source(here::here("functions/plot-theme-func.R"))
+```
+
+
+When John Ioannidis published his now-famous essay claiming that most medical findings are wrong, the shock waves quickly spilled over into ecology and evolutionary biology. Two decades later, the worry hasn’t gone away—and low statistical power is still public enemy #1.
+
+Be honest: when was the last time you read an ecological study that did a power analysis before anyone touched a pipette or set foot in the field? I’m struggling to think of one. Part of the problem is how we’re trained; we obsess over p-values after the fact, but rarely ask, “What’s the chance this experiment can even detect the effect we care about?” And once you add nested treatments, random effects, and all the other ecological quirks, power analysis starts to feel like wizardry.
+
+The price of skipping it can be brutal. A friend recently told me about a PhD student stuck in limbo after running a physiology experiment with noisy measurements and too few replicates. Now she’s battling to publish results that were practically doomed from day one. A quick simulation-based power check could have flagged the problem early and spared a whole lot of time, money, and stress.
+
+That’s the goal of this post. I’ll show how simple simulations make power analysis can be used for bread-and-butter tests like the t-test and Pearson correlation tests. In a follow-up post we’ll scale up to the messy, multi-layered designs ecologists actually use. 
+
+The payoff: experiments that are worth running because they stand a real chance of telling us something true.
+
+## t-test: N-addition experiment
+
+In the world of plant ecology, nitrogen (or other nutrient) addition experiments are common-place. These experiments typically have a simple design: Some plots are given standard levels of nutrients (i.e. the control plots) whilst others are given elevated nitrogen levels (i.e. the treatment plots). We then compare the aboveground biomass (usually dried) of the control plots to the treatment plots with the expectation that there will more aboveground dry biomass in the treatment plots compared to the control plots.
+
+### What is statistical power?
+
+Statistical power is the probability that an experiment will detect a statistically significant effect, assuming a true effect exists. We typically aim for a power of at least 80%. In N-addition experiments, biomass increases of around 50% are commonly observed. Therefore, we want our experiment to have an 80% chance of rejecting the null hypothesis if the treatment truly increases biomass by 50%. In other words, if the treatment effect is a 50% increase in biomass, our experiment should yield a significant result 80% of the time.
+
+There are three things that affect statistical power: The magnitude of the effect (i.e. 50% increase in biomass in this case), the variability within each treatment (i.e. the variance in biomass among replicates in the control and treatments plots) and the number of samples. When designing an experiment, we can only really control the number of samples. Therefore, we will focus on simulating statistical for experiments with different numbers of samples.
+
+### Simulating experiments
+
+When doing a power analysis, we need to make some assumptions about the data that we plan to collect. This can be done via a literature search or via a pilot experiment. In this case, we will use biomass numbers from Tilman (1984) to estimate the average $g~m^{-2}$ of grassland plants under control conditions along with the standard deviation:
+
+```{r}
+# numbers taken from Tilman (1984) based on biomass in 3 x 3 m plots
+
+# mean of the control Tilman (1984)
+mu_control <- 80
+
+# standard deviation of the control
+sd_control <- 30
+```
+
+We want to be able to reliably reject the null hypothesis if the mean $g~m^{-2}$ of grassland plants under nitrogen addition is at least 50% greater than that under control conditions. We assume that the standard deviation is the same as in the control plots.
+
+```{r}
+# mean of the treatment based on a 50% increase
+mu_treatment <- 120
+
+# standard deviation of the treatment
+sd_treatment <- 30
+```
+
+We are making the assumption for the purposes of this power analysis that the true distribution of biomass values in the control is: $Normal(80, 15)$ and the true distribution of biomass values in the treatment is: $Normal(120, 15)$. Let's visualise these two true distributions by simulating a large number of samples from both these distributions and plotting them:
+
+```{r}
+# N of true distributions
+n_true <- 1000000
+
+# true_control
+true_control <- rnorm(n = n_true, mean = mu_control, sd = sd_control)
+
+# true_treatment
+true_treatment <- rnorm(n = n_true, mean = mu_treatment, sd = sd_treatment)
+
+# plot these data as density plots
+library(ggplot2)
+ggplot(data = dplyr::tibble(Treatment = rep(c("Control", "Treatment"), each = n_true),
+                            Biomass = c(true_control, true_treatment)),
+       mapping = aes(x = Biomass, colour = Treatment, fill = Treatment)) +
+  geom_density(alpha = 0.5) +
+  xlab("Biomass (g/m2)") +
+  ylab("Density") +
+  theme_meta()
+```
+
+In an experiment, we are theoretically *drawing samples* from these true distributions. And, given that we have defined these true, theoretical distributions, we can simulate hypothetical experiments and examine their results. Let's simulate an experiment where we have 8 control plots and 8 treatment plots and compare the samples visually:
+
+```{r}
+# set seed for reproducibility
+set.seed(146970)
+
+# n samples
+n <- 8
+
+# draw 10 plots from the control distribution
+sample_control <- rnorm(n = n, mean = mu_control, sd = sd_control)
+
+# draw 10 plots from the treatment distribution
+sample_treatment <- rnorm(n = n, mean = mu_treatment, sd = sd_treatment)
+
+# wrap into a data.frame
+exp_df <- dplyr::tibble(Treatment = rep(c("Control", "Treatment"), each = n),
+                        Biomass = c(sample_control, sample_treatment))
+
+# summarise the data
+exp_df_sum <-
+  exp_df |>
+  dplyr::group_by(Treatment) |>
+  dplyr::summarise(Biomass_m = mean(Biomass),
+                   Biomass_sd = sd(Biomass))
+
+# plot a comparative plot
+library(ggplot2)
+ggplot() +
+  geom_jitter(data = exp_df,
+              mapping = aes(x = Treatment, y = Biomass),
+              width = 0.05, shape = 1) +
+  geom_point(data = exp_df_sum,
+             mapping = aes(x = Treatment, y = Biomass_m), size = 2) +
+  geom_errorbar(data = exp_df_sum,
+                mapping = aes(x = Treatment, 
+                              ymin = Biomass_m - Biomass_sd,
+                              ymax = Biomass_m + Biomass_sd),
+                width = 0) +
+  ylab("Biomass (g/m2)") +
+  xlab(NULL) +
+  theme_meta()
+```
+
+We can now use a two-sample t-test to test whether there is evidence that the mean biomass in the treatment (N-addition) differs from the mean biomass in the control. More specifically, we can test the null hypothesis ($H_0$) that the mean in the treatment ($\mu_{control}$) is equal to the mean biomass in the control ($\mu_{control}$):
+
+$$
+H_0: \mu_{control} = \mu_{treatment}
+$$
+
+To run the two-sample t-test, we use the t.test() function:
+
+```{r}
+# run the t.test
+t.test(x = sample_treatment, y = sample_control, var.equal = TRUE, mu = 0, alternative = "two.sided")
+```
+
+Based on this two-sample t-test, we cannot reject the null hypothesis that the mean biomass in the treatment is the same as the mean biomass in the control ($H_0: \mu_{control} = \mu_{treatment}$). Therefore, in a typical case, we would conclude that N addition has no effect on biomass.
+
+The problem with this conclusion is that we have no estimate of statistical power. As a result, we don’t know the probability that our experiment would detect a statistically significant effect if the true mean biomass in the treatment were 50% higher than in the control. If this experiment only had a power of 20%, our conclusion would be very different than if the experiment had a power of 80%.
+
+### Estimating statistical power using simulation
+
+To estimate statistical power, we effectively want to do an experiment a large number of times and then determine how many times we reject the null hypothesis. Therefore, to estimate the statistical power of the experiment that we just *conducted* (i.e. 8 control plots and 8 treatment plots based on an assumed control mean biomass of 80 $g~m^{-2}$, an assumed treatment mean biomass of 120 $g~m^{-2}$ and an assumed standard deviation of 30 $g~m^{-2}$), we need to simulate this experiment many times and see how many times we reject the null hypothesis. The statistical power is then the proportion of simulated experiments in which the null hypothesis is rejected.
+
+To do this, we simply run the same experimental simulation a large number of times and, each time, perform the two-sample t-test and collect the p-values. We then count the number of times that we reject the null hypothesis. For clarity, we set the parameters of the theoretical control and treatment distributions along with the number of samples (i.e. n = 8 in this case).
+
+```{r}
+# set the parameters of the theoretical control and treatment distributions
+
+# mean of the control Tilman (1984)
+mu_control <- 80
+
+# standard deviation of the control
+sd_control <- 30
+
+# mean of the treatment based on a 50% increase
+mu_treatment <- 120
+
+# standard deviation of the treatment
+sd_treatment <- 30
+
+# n samples
+n <- 8
+```
+
+We then run 1000 of these experiments, perform a two-sample t-test and then collect the results:
+
+```{r}
+# set the number of experiments to run
+n_exp <- 1000
+
+p_list <- vector("list", length = n_exp)
+for (i in seq_len(n_exp)) {
+  
+  # draw 10 plots from the control distribution
+  sample_control <- rnorm(n = n, mean = mu_control, sd = sd_control)
+
+  # draw 10 plots from the treatment distribution
+  sample_treatment <- rnorm(n = n, mean = mu_treatment, sd = sd_treatment)
+  
+  # run the test
+  t_text_x <- t.test(x = sample_treatment, 
+                     y = sample_control,
+                     var.equal = TRUE, mu = 0, alternative = "two.sided")
+  
+  # extract the p-value
+  p_list[[i]] <- t_text_x
+  
+}
+```
+
+We can now count the number of significant results divided by the number of experiments and arrive at a simulated estimate of the statistical power. So, for this experiment, we would reject the null hypothesis around 70% of the time if the treatment mean was at least 50% higher than the control mean.
+
+```{r}
+# calculate the statistical power
+power <- sum(sapply(p_list, function(x) x[["p.value"]]) < 0.05)/n_exp
+
+# print the result
+print(paste0("Statistical power: ", power))
+```
+
+This is a relatively high level of statistical power. However, we said we wanted at least 80% power. So, we are going to repeat these simulations but for different numbers of samples and then examine the number of samples required to reach 80% power.
+
+```{r}
+# set the different sample size values to test
+n_vec <- seq(2, 20, 1)
+
+# set the number of experiments to run for each sample size
+n_exp <- 10000
+
+power_vec <- vector(length = length(n_vec))
+for (j in seq_along(power_vec)) {
+  
+  p_list <- vector("list", length = n_exp)
+  for (i in seq_len(n_exp)) {
+  
+    # draw 10 plots from the control distribution
+    sample_control <- rnorm(n = n_vec[j], mean = mu_control, sd = sd_control)
+
+    # draw 10 plots from the treatment distribution
+    sample_treatment <- rnorm(n = n_vec[j], mean = mu_treatment, sd = sd_treatment)
+  
+    # run the test
+    t_text_x <- t.test(x = sample_treatment, 
+                       y = sample_control,
+                       var.equal = TRUE, mu = 0, alternative = "two.sided")
+  
+    # extract the p-value
+    p_list[[i]] <- t_text_x
+    
+  }
+  power_vec[j] <- sum(sapply(p_list, function(x) x[["p.value"]]) < 0.05)/n_exp
+}
+```
+
+We can now plot the power curve. This curve shows that we can achieve 80% power with just 10 control plots and 10 treatment plots. Moreover, if we want to achieve over 90% power, we only need 15 control plots and 15 treatment plots.
+
+```{r}
+# we now plot the power-curves
+ggplot(data = dplyr::tibble(n = n_vec,
+                            power = power_vec),
+       mapping = aes(x = n, y = power)) +
+  geom_line() +
+  geom_hline(yintercept = 0.80, linetype = "dashed", colour = "red") +
+  ylab("Statistical power") +
+  xlab("Number of samples") +
+  theme_meta()
+```
+
+### Going beyond statistical power
+
+This is an aside but what is also nice about simulations is that we can also examine how accurate the confidence intervals around the estimated mean difference are. In these examples, the true mean difference between the control and the treatment is 40 $g~m^{-2}$. We can also calculate the 95% confidence interval ($CI_{95\%}$) around the mean difference which is calculated as:
+
+$$
+CI_{95\%} = (\bar{X}_{treatment} - \bar{X}_{treatment}) ± t_{14}SE_{(\bar{X}_{treatment} - \bar{X}_{treatment})}
+$$
+
+Conveniently, this is also exported by the t.test() function. Therefore, we will run the simulations again and compare the 95% confidence intervals of the difference in means for each experiment to the true mean difference which is 40 $g~m^{-2}$:
+
+```{r}
+# set the different sample size values to test
+n_vec <- seq(2, 20, 1)
+
+# set the number of experiments to run for each sample size
+n_exp <- 100
+
+ci_vec <- vector("list", length = length(n_vec))
+for (j in seq_along(ci_vec)) {
+  
+  p_list <- vector("list", length = n_exp)
+  for (i in seq_len(n_exp)) {
+  
+    # draw 10 plots from the control distribution
+    sample_control <- rnorm(n = n_vec[j], mean = mu_control, sd = sd_control)
+
+    # draw 10 plots from the treatment distribution
+    sample_treatment <- rnorm(n = n_vec[j], mean = mu_treatment, sd = sd_treatment)
+  
+    # run the test
+    t_text_x <- t.test(x = sample_treatment, 
+                       y = sample_control,
+                       var.equal = TRUE, mu = 0, alternative = "two.sided")
+  
+    # extract the p-value
+    p_list[[i]] <- t_text_x
+    
+  }
+  
+  # extract confidence intervals
+  conf_x <- 
+    lapply(p_list, function(x) {
+      dplyr::tibble(conf_low = x$conf.int[1],
+                    conf_high = x$conf.int[2])
+    })
+  
+  # extract relevant metadata
+  metadata <- dplyr::tibble(n = n_vec[j],
+                            rep = n_vec[j] + rnorm(length(conf_x), 0, 0.2))
+  
+  # bind into a data.frame with metadata
+  ci_vec[[j]] <- dplyr::bind_cols(metadata,
+                                  dplyr::bind_rows(conf_x))
+}
+
+# bind into a single data.frame
+ci_df <- dplyr::bind_rows(ci_vec)
+
+# we now plot 95% confidence against the true mean
+ggplot() +
+  geom_errorbar(data = ci_df,
+                mapping = aes(x = rep, ymin = conf_low, ymax = conf_high),
+                width = 0, alpha = 0.5) +
+  geom_hline(yintercept = mu_treatment - mu_control, linetype = "dashed", colour = "red") +
+  ylab("Biomass (g/m2) CI95%") +
+  xlab("Number of samples") +
+  theme_meta()
+```
+
+So, in the above plot, we have plotted the confidence intervals of different experiments with differing numbers of samples and overlaid the true mean difference of 40 $g~m^{-2}$ as a red, dashed line. As a result, we can also get an idea of how reliable the estimated confidence intervals are likely to be given different numbers of samples.
+
+### Summary
+
+This was an overview of the simulation-based approach to power-analysis.
+
+## Bonus material: Pearson correlation test
+
+
+
+
+
+
+
+
+

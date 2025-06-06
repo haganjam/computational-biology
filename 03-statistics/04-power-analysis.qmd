@@ -1,9 +1,20 @@
 ---
 title: "Power, power and more power"
 format: html
-editor: visual
+editor: source
 ---
 
+Structure:
+
+game of the goose, argenx
+
+Introducted me to some crucial questions that I don't think biologists think about very much.
+
+Analogy with disease.
+
+Ioannidis work, McElreath
+
+Applied example: Estimating statistical power for a plant experiment
 
 
 When I was still in my *corporate James* phase as many of you were referring to me, I applied for statistical modelling position at one of the BEL20 bio-technology companies: **argenx**. The first step after the initial screening was a task based around the Game of the Goose or, in Dutch, [*Ganzenbord*](https://nl.wikipedia.org/wiki/Ganzenbord).
@@ -11,11 +22,9 @@ When I was still in my *corporate James* phase as many of you were referring to 
 *Ganzenbord* is effectively a race determined by dice roles where players move their player forward by the number of places according to the number of rolls. Traditionally, the game ends when one player reaches *exactly* 63. However, in this version, a player wins when they cross 63 and wins by the amount that they overshoot 63 by (e.g. if both players are on 61 and **player A** rolls a five whilst **player B** rolls a one, **player A** would win by four points):
 
 ::: {#fig-ganzenbord}
-
 ![](figures-tables/ganzenbord.JPG)
 
 Example of a traditional *Ganzenbord* board.
-
 :::
 
 In this context, there were several questions that we had to answer. For example:
@@ -299,23 +308,21 @@ plot(p12)
 
 ```
 
-To me, these kinds of issues, which were illustrated to me by this task get to the core of the role of statistics in science. 
+To me, these kinds of issues, which were illustrated to me by this task get to the core of the role of statistics in science.
 
-1. How do we know when two experimental treatments are different or the same?
-2. How big are differences between treatments likely to be and can our experimental set-up detect such differences?
-3. If we do not see a differences between groups, does this mean that there is no difference or does it mean that our experiment was unlikely to detect it?
+1.  How do we know when two experimental treatments are different or the same?
+2.  How big are differences between treatments likely to be and can our experimental set-up detect such differences?
+3.  If we do not see a differences between groups, does this mean that there is no difference or does it mean that our experiment was unlikely to detect it?
 
 In the pharmaceutical and bio-technology industries, people think about these questions a lot. However, based on my experience, biologists and ecologists pay almost no attention to these kinds of questions.
 
 For me, there are two important consequences of ignoring these questions:
 
-1. Doing experiments that are unable to detect even small differences among treatments. If, based on literature or pilot experiments, we can estimate the chance of detecting an effect and the chance is very low (e.g. 10%), it is probably not worth doing the experiment.
+1.  Doing experiments that are unable to detect even small differences among treatments. If, based on literature or pilot experiments, we can estimate the chance of detecting an effect and the chance is very low (e.g. 10%), it is probably not worth doing the experiment.
 
-2. Interpreting null results. If our experiment is unlikely to detect a given effect and we do not detect that effect, what does it mean? Is there no effect or is our experiment bad?
+2.  Interpreting null results. If our experiment is unlikely to detect a given effect and we do not detect that effect, what does it mean? Is there no effect or is our experiment bad?
 
 Disease testing analogies... Maybe this is something to look into as well... How are we going to structure this thing...
-
-
 
 
 

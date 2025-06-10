@@ -1,5 +1,5 @@
 ---
-title: "Why statistical power matter for ecological research"
+title: "Why statistical power matters for ecological research"
 format: html
 editor: source
 ---
@@ -68,14 +68,21 @@ true_control <- rnorm(n = n_true, mean = mu_control, sd = sd_control)
 true_treatment <- rnorm(n = n_true, mean = mu_treatment, sd = sd_treatment)
 
 # plot these data as density plots
-library(ggplot2)
-ggplot(data = dplyr::tibble(Treatment = rep(c("Control", "Treatment"), each = n_true),
-                            Biomass = c(true_control, true_treatment)),
+p1 <-
+  ggplot(data = dplyr::tibble(Treatment = rep(c("Control", "Treatment"), each = n_true),
+                              Biomass = c(true_control, true_treatment)),
        mapping = aes(x = Biomass, colour = Treatment, fill = Treatment)) +
   geom_density(alpha = 0.5) +
   xlab("Biomass (g/m2)") +
   ylab("Density") +
-  theme_meta()
+  theme_meta() +
+  theme(legend.position = "top",
+        legend.title = element_blank())
+p1
+
+# export
+ggsave(here::here("03-statistics/figures-tables/02-fig-a.png"), p1,
+       dpi = 600, width = 7, height = 5.5)
 ```
 
 In an experiment, we are theoretically *drawing samples* from these true distributions. And, given that we have defined these true, theoretical distributions, we can simulate hypothetical experiments and examine their results. Let's simulate an experiment where we have 8 control plots and 8 treatment plots and compare the samples visually:
@@ -105,21 +112,29 @@ exp_df_sum <-
                    Biomass_sd = sd(Biomass))
 
 # plot a comparative plot
-library(ggplot2)
-ggplot() +
+p1 <- 
+  ggplot() +
   geom_jitter(data = exp_df,
-              mapping = aes(x = Treatment, y = Biomass),
+              mapping = aes(x = Treatment, y = Biomass, colour = Treatment),
               width = 0.05, shape = 1) +
   geom_point(data = exp_df_sum,
-             mapping = aes(x = Treatment, y = Biomass_m), size = 2) +
+             mapping = aes(x = Treatment, y = Biomass_m, 
+                           colour = Treatment, fill = Treatment), size = 2) +
   geom_errorbar(data = exp_df_sum,
                 mapping = aes(x = Treatment, 
                               ymin = Biomass_m - Biomass_sd,
-                              ymax = Biomass_m + Biomass_sd),
+                              ymax = Biomass_m + Biomass_sd,
+                              colour = Treatment),
                 width = 0) +
   ylab("Biomass (g/m2)") +
   xlab(NULL) +
-  theme_meta()
+  theme_meta() +
+  theme(legend.position = "none")
+p1
+
+# export
+ggsave(here::here("03-statistics/figures-tables/02-fig-b.png"), p1,
+       dpi = 600, width = 6, height = 5)
 ```
 
 We can now use a two-sample t-test to test whether there is evidence that the mean biomass in the treatment (N-addition) differs from the mean biomass in the control. More specifically, we can test the null hypothesis ($H_0$) that the mean in the treatment ($\mu_{control}$) is equal to the mean biomass in the control ($\mu_{control}$):
@@ -168,7 +183,7 @@ We then run 1000 of these experiments, perform a two-sample t-test and then coll
 
 ```{r}
 # set the number of experiments to run
-n_exp <- 1000
+n_exp <- 10000
 
 p_list <- vector("list", length = n_exp)
 for (i in seq_len(n_exp)) {
@@ -238,14 +253,22 @@ We can now plot the power curve. This curve shows that we can achieve 80% power 
 
 ```{r}
 # we now plot the power-curves
-ggplot(data = dplyr::tibble(n = n_vec,
+p1 <-
+  ggplot(data = dplyr::tibble(n = n_vec,
                             power = power_vec),
        mapping = aes(x = n, y = power)) +
   geom_line() +
   geom_hline(yintercept = 0.80, linetype = "dashed", colour = "red") +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2)) +
+  scale_x_continuous(breaks = n_vec) +
   ylab("Statistical power") +
   xlab("Number of samples") +
   theme_meta()
+p1
+
+# export
+ggsave(here::here("03-statistics/figures-tables/02-fig-c.png"), p1,
+       dpi = 600, width = 6, height = 5)
 ```
 
 ### Going beyond statistical power

@@ -309,7 +309,7 @@ Let's now load the data and see what it looks like:
 
 ```{r}
 # load the seaweed fly data from github
-fly_dat <- readr::read_csv(url("https://raw.githubusercontent.com/haganjam/Rworkshops/main/03-causal-inference/data/seaweed-flies.csv"))
+fly_dat <- readr::read_csv(url("https://raw.githubusercontent.com/haganjam/computational-biology/refs/heads/main/03-statistics/data/seaweed-flies.csv"))
 
 # check the first few rows of data
 head(fly_dat)
